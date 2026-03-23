@@ -11,6 +11,11 @@ struct AuthResponse: Codable {
     let role: String
 }
 
+// MARK: - Categories
+struct CategoriesResponse: Codable {
+    let categories: [String]
+}
+
 // MARK: - Wallpapers
 struct WallpaperResponse: Codable, Identifiable {
     let id: String

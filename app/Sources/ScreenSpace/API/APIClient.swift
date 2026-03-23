@@ -52,6 +52,12 @@ final class APIClient: @unchecked Sendable {
         try await get(path: "/api/v1/wallpapers/recent", query: ["limit": "\(limit)", "offset": "\(offset)"])
     }
 
+    // MARK: - Categories
+    func listCategories() async throws -> [String] {
+        let response: CategoriesResponse = try await get(path: "/api/v1/categories")
+        return response.categories
+    }
+
     // MARK: - Upload
     func initiateUpload(title: String, category: String?, tags: [String]) async throws -> UploadInitResponse {
         let body: [String: Any] = ["title": title, "category": category as Any, "tags": tags]

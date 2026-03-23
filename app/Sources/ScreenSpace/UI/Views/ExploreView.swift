@@ -81,7 +81,12 @@ struct ExploreView: View {
     }
 
     private func loadCategories() async {
-        categories = ["nature", "abstract", "urban", "cinematic", "space", "underwater", "minimal"]
+        do {
+            categories = try await appState.api.listCategories()
+        } catch {
+            // Fallback to known categories if API unavailable
+            categories = ["nature", "abstract", "urban", "cinematic", "space", "underwater", "minimal", "other"]
+        }
     }
 
     private func selectCategory(_ category: String) async {
