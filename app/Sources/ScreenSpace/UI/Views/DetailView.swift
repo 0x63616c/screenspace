@@ -12,7 +12,7 @@ struct DetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
                 // Video preview area
                 if let previewURLString = wallpaper.previewURL,
                    let previewURL = URL(string: previewURLString) {
@@ -32,7 +32,7 @@ struct DetailView: View {
 
                 // Metadata overlay
                 GlassCard {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: Spacing.md) {
                         Text(wallpaper.title)
                             .font(.title2)
                             .fontWeight(.bold)
@@ -46,7 +46,7 @@ struct DetailView: View {
                                 .clipShape(Capsule())
                         }
 
-                        HStack(spacing: 16) {
+                        HStack(spacing: Spacing.lg) {
                             Label(wallpaper.resolution, systemImage: "rectangle.on.rectangle")
                                 .accessibilityLabel("Resolution: \(wallpaper.resolution)")
                             Label(formattedSize, systemImage: "doc")
@@ -72,7 +72,7 @@ struct DetailView: View {
                             }
                         }
 
-                        HStack(spacing: 12) {
+                        HStack(spacing: Spacing.md) {
                             Button(action: setAsWallpaper) {
                                 Label("Set as Wallpaper", systemImage: "photo.on.rectangle")
                             }

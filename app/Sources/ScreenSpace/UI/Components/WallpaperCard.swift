@@ -23,7 +23,7 @@ struct WallpaperCard: View {
 
     var body: some View {
         Button(action: { onTap?() }) {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
             ZStack(alignment: .topTrailing) {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(
@@ -54,7 +54,7 @@ struct WallpaperCard: View {
                     }
 
                 ResolutionBadge(width: data.width, height: data.height)
-                    .padding(8)
+                    .padding(Spacing.sm)
             }
             .scaleEffect(isHovered ? 1.04 : 1.0)
             .shadow(
@@ -68,7 +68,7 @@ struct WallpaperCard: View {
                 isHovered = hovering
             }
 
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.xs) {
                 Text(data.title)
                     .font(.subheadline)
                     .fontWeight(.medium)

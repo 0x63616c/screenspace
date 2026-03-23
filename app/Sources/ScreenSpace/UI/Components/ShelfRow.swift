@@ -7,7 +7,7 @@ struct ShelfRow: View {
     var onSeeAll: (() -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Spacing.md) {
             HStack {
                 Text(title)
                     .font(.title3)
@@ -20,15 +20,15 @@ struct ShelfRow: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, Spacing.xl)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 14) {
+                LazyHStack(spacing: Spacing.md) {
                     ForEach(wallpapers) { wallpaper in
                         WallpaperCard(data: wallpaper, onTap: { onSelectWallpaper?(wallpaper) })
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, Spacing.xl)
             }
         }
     }

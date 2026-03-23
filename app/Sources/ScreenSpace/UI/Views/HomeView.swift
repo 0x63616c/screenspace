@@ -32,12 +32,12 @@ struct HomeView: View {
                 }
                 .frame(maxWidth: .infinity)
             } else {
-                VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: Spacing.xxl) {
                     if let error = loadError {
                         Text(error)
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .padding(.horizontal, 20)
+                            .padding(.horizontal, Spacing.xl)
                     }
 
                     HeroSection(
@@ -50,7 +50,7 @@ struct HomeView: View {
                             Task { _ = try? await appState.api.toggleFavorite(id: f.id) }
                         }
                     )
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, Spacing.xl)
 
                     ShelfRow(title: "Popular", wallpapers: popular, onSelectWallpaper: { data in
                         fetchAndShow(id: data.id)
@@ -59,7 +59,7 @@ struct HomeView: View {
                         fetchAndShow(id: data.id)
                     })
                 }
-                .padding(.vertical, 20)
+                .padding(.vertical, Spacing.xl)
             }
         }
         .scrollContentBackground(.hidden)
