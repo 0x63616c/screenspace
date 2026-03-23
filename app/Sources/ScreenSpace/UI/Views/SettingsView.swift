@@ -1,6 +1,15 @@
 import SwiftUI
 import ServiceManagement
 
+private extension View {
+    func settingsTabStyle() -> some View {
+        self
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .frame(maxHeight: .infinity, alignment: .top)
+    }
+}
+
 struct SettingsView: View {
     @Environment(AppState.self) var appState
     @State private var config = ConfigManager.shared.config
@@ -60,9 +69,7 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .frame(maxHeight: .infinity, alignment: .top)
+        .settingsTabStyle()
     }
 
     private var playbackTab: some View {
@@ -85,9 +92,7 @@ struct SettingsView: View {
                 Text("Fit (letterbox)").tag(VideoGravityOption.resizeAspect)
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .frame(maxHeight: .infinity, alignment: .top)
+        .settingsTabStyle()
     }
 
     private var storageTab: some View {
@@ -109,9 +114,7 @@ struct SettingsView: View {
                 cacheSize = 0
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .frame(maxHeight: .infinity, alignment: .top)
+        .settingsTabStyle()
     }
 
     private var displaysTab: some View {
@@ -143,9 +146,7 @@ struct SettingsView: View {
                 }
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .frame(maxHeight: .infinity, alignment: .top)
+        .settingsTabStyle()
     }
 
     private var accountTab: some View {
@@ -166,9 +167,7 @@ struct SettingsView: View {
                 .buttonStyle(.borderedProminent)
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .frame(maxHeight: .infinity, alignment: .top)
+        .settingsTabStyle()
         .sheet(isPresented: $showLogin) {
             LoginView()
         }
