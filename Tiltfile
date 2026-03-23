@@ -15,7 +15,7 @@ local_resource(
     serve_cmd='cd server && go run .',
     deps=['server'],
     ignore=['server/*_test.go', 'server/coverage.out'],
-    env={
+    serve_env={
         'DATABASE_URL': 'postgres://screenspace:devpassword@localhost:5432/screenspace?sslmode=disable',
         'S3_ENDPOINT': 'http://localhost:9000',
         'S3_BUCKET': 'screenspace',
