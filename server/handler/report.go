@@ -64,6 +64,11 @@ func (h *ReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(req.Reason) > 500 {
+		http.Error(w, `{"error":"reason must be 500 characters or fewer"}`, http.StatusBadRequest)
+		return
+	}
+
 	report, err := h.reports.Create(r.Context(), wallpaperID, claims.UserID, req.Reason)
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)

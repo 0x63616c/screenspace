@@ -201,6 +201,52 @@ func TestCreateWallpaper_MissingTitle(t *testing.T) {
 	}
 }
 
+func TestCreateWallpaper_TitleTooLong(t *testing.T) {
+	env := newTestWallpaperHandler(t)
+	u := env.createUser(t, "create-longtitle@example.com", "user")
+
+	longTitle := strings.Repeat("a", 256)
+	body := fmt.Sprintf(`{"title":"%s"}`, longTitle)
+	w, r := env.authRequest(t, http.MethodPost, "/wallpapers", body, u.ID, "user")
+	env.handler.Create(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCreateWallpaper_TooManyTags(t *testing.T) {
+	env := newTestWallpaperHandler(t)
+	u := env.createUser(t, "create-manytags@example.com", "user")
+
+	tags := make([]string, 11)
+	for i := range tags {
+		tags[i] = fmt.Sprintf("tag%d", i)
+	}
+	tagsJSON, _ := json.Marshal(tags)
+	body := fmt.Sprintf(`{"title":"Test","tags":%s}`, tagsJSON)
+	w, r := env.authRequest(t, http.MethodPost, "/wallpapers", body, u.ID, "user")
+	env.handler.Create(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCreateWallpaper_TagTooLong(t *testing.T) {
+	env := newTestWallpaperHandler(t)
+	u := env.createUser(t, "create-longtag@example.com", "user")
+
+	longTag := strings.Repeat("b", 51)
+	body := fmt.Sprintf(`{"title":"Test","tags":["%s"]}`, longTag)
+	w, r := env.authRequest(t, http.MethodPost, "/wallpapers", body, u.ID, "user")
+	env.handler.Create(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestCreateWallpaper_Unauthorized(t *testing.T) {
 	env := newTestWallpaperHandler(t)
 

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	_ "github.com/lib/pq"
@@ -150,6 +151,22 @@ func TestReportWallpaper_MissingReason(t *testing.T) {
 	wp := env.createApprovedWallpaper(t, "Report NoReason WP", u.ID)
 
 	body := `{}`
+	w, r := env.authRequest(t, http.MethodPost, "/wallpapers/"+wp.ID+"/report", body, u.ID, "user")
+	r.SetPathValue("id", wp.ID)
+	env.handler.Create(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestReportWallpaper_ReasonTooLong(t *testing.T) {
+	env := newTestReportHandler(t)
+	u := env.createUser(t, "reporter-longreason@example.com", "user")
+	wp := env.createApprovedWallpaper(t, "Report LongReason WP", u.ID)
+
+	longReason := strings.Repeat("x", 501)
+	body := fmt.Sprintf(`{"reason":"%s"}`, longReason)
 	w, r := env.authRequest(t, http.MethodPost, "/wallpapers/"+wp.ID+"/report", body, u.ID, "user")
 	r.SetPathValue("id", wp.ID)
 	env.handler.Create(w, r)

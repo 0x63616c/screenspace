@@ -64,6 +64,23 @@ func (h *WallpaperHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(req.Title) > 255 {
+		http.Error(w, `{"error":"title must be 255 characters or fewer"}`, http.StatusBadRequest)
+		return
+	}
+
+	if len(req.Tags) > 10 {
+		http.Error(w, `{"error":"maximum 10 tags allowed"}`, http.StatusBadRequest)
+		return
+	}
+
+	for _, tag := range req.Tags {
+		if len(tag) > 50 {
+			http.Error(w, `{"error":"each tag must be 50 characters or fewer"}`, http.StatusBadRequest)
+			return
+		}
+	}
+
 	storageKey := fmt.Sprintf("wallpapers/%s/original.mp4", "pending")
 	wp, err := h.wallpapers.Create(r.Context(), repository.CreateParams{
 		Title:      req.Title,
