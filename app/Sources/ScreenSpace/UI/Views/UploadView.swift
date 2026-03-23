@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -23,13 +24,27 @@ struct UploadView: View {
             // File picker
             GroupBox {
                 if let url = selectedFileURL {
-                    HStack {
-                        Image(systemName: "film")
-                        Text(url.lastPathComponent)
-                        Spacer()
-                        Button("Change") { pickFile() }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Image(systemName: "film")
+                            Text(url.lastPathComponent)
+                            Spacer()
+                            if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+                               let size = attrs[.size] as? Int {
+                                let mb = Double(size) / 1_000_000
+                                Text(String(format: "%.1f MB", mb))
+                                    .font(.caption)
+                                    .foregroundStyle(mb > 200 ? .red : .secondary)
+                            }
+                            Button("Change") { pickFile() }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                        }
+                        if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+                           let size = attrs[.size] as? Int, Double(size) / 1_000_000 > 200 {
+                            Text("File exceeds 200 MB limit")
+                                .font(.caption).foregroundStyle(.red)
+                        }
                     }
                 } else {
                     Button("Select Video File") { pickFile() }
@@ -41,16 +56,29 @@ struct UploadView: View {
             TextField("Title", text: $title)
                 .textFieldStyle(.roundedBorder)
 
-            TextField("Category (e.g. nature, abstract, urban)", text: $category)
-                .textFieldStyle(.roundedBorder)
+            Picker("Category", selection: $category) {
+                Text("Select category").tag("")
+                ForEach(["nature", "abstract", "urban", "cinematic", "space", "underwater", "minimal", "other"], id: \.self) { cat in
+                    Text(cat.capitalized).tag(cat)
+                }
+            }
 
             TextField("Tags (comma separated)", text: $tagsText)
                 .textFieldStyle(.roundedBorder)
 
             // Content policy
             Toggle(isOn: $acceptedPolicy) {
-                Text("I confirm this content complies with the content policy and I have the rights to upload it")
-                    .font(.caption)
+                HStack(spacing: 4) {
+                    Text("I confirm this content complies with the")
+                    Text("content policy")
+                        .foregroundStyle(.blue)
+                        .underline()
+                        .onTapGesture {
+                            NSWorkspace.shared.open(URL(string: "https://github.com/0x63616c/screenspace/blob/main/CONTENT_POLICY.md")!)
+                        }
+                    Text("and I have the rights to upload it")
+                }
+                .font(.caption)
             }
 
             if let error = errorMessage {
