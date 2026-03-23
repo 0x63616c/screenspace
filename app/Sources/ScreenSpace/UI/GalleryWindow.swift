@@ -58,6 +58,7 @@ struct GalleryContentView: View {
     @State private var selectedSection: GallerySection? = .home
     @State private var showSettings = false
     @State private var showUpload = false
+    @State private var showLogin = false
 
     var body: some View {
         NavigationSplitView {
@@ -69,7 +70,13 @@ struct GalleryContentView: View {
         .navigationSplitViewStyle(.balanced)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button(action: { showUpload = true }) {
+                Button(action: {
+                    if appState.isLoggedIn {
+                        showUpload = true
+                    } else {
+                        showLogin = true
+                    }
+                }) {
                     Label("Upload", systemImage: "arrow.up.circle")
                 }
             }
@@ -84,6 +91,9 @@ struct GalleryContentView: View {
         }
         .sheet(isPresented: $showUpload) {
             UploadView()
+        }
+        .sheet(isPresented: $showLogin) {
+            LoginView()
         }
     }
 

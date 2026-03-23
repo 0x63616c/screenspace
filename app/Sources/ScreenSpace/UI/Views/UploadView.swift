@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct UploadView: View {
+    @Environment(AppState.self) var appState
     @Environment(\.dismiss) private var dismiss
     @State private var selectedFileURL: URL?
     @State private var title = ""
@@ -12,8 +13,6 @@ struct UploadView: View {
     @State private var uploadProgress: Double = 0
     @State private var errorMessage: String?
     @State private var uploadComplete = false
-
-    private let api = APIClient()
 
     var body: some View {
         VStack(spacing: 16) {
@@ -110,7 +109,7 @@ struct UploadView: View {
         do {
             // Step 1: Initiate upload
             uploadProgress = 0.1
-            let initResponse = try await api.initiateUpload(
+            let initResponse = try await appState.api.initiateUpload(
                 title: title,
                 category: category.isEmpty ? nil : category,
                 tags: tags
@@ -129,7 +128,7 @@ struct UploadView: View {
 
             // Step 3: Finalize
             uploadProgress = 0.8
-            try await api.finalizeUpload(id: initResponse.id)
+            try await appState.api.finalizeUpload(id: initResponse.id)
 
             uploadProgress = 1.0
             uploadComplete = true
