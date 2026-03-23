@@ -25,9 +25,18 @@ final class GalleryWindowController {
         window.title = "ScreenSpace"
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        window.contentView = hostingView
+
+        // Frosted glass window background via NSVisualEffectView
+        let visualEffect = NSVisualEffectView()
+        visualEffect.blendingMode = .behindWindow
+        visualEffect.state = .active
+        visualEffect.material = .sidebar
+        visualEffect.autoresizingMask = [.width, .height]
+
+        hostingView.autoresizingMask = [.width, .height]
+        visualEffect.addSubview(hostingView)
+
+        window.contentView = visualEffect
         window.makeKeyAndOrderFront(nil)
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 900, height: 600)
@@ -68,8 +77,6 @@ struct GalleryContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationSplitViewStyle(.balanced)
-        .containerBackground(.ultraThinMaterial, for: .window)
-        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(action: { showUpload = true }) {
