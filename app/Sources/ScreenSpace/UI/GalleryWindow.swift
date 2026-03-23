@@ -25,18 +25,7 @@ final class GalleryWindowController {
         window.title = "ScreenSpace"
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
-
-        // Frosted glass window background via NSVisualEffectView
-        let visualEffect = NSVisualEffectView()
-        visualEffect.blendingMode = .behindWindow
-        visualEffect.state = .active
-        visualEffect.material = .sidebar
-        visualEffect.autoresizingMask = [.width, .height]
-
-        hostingView.autoresizingMask = [.width, .height]
-        visualEffect.addSubview(hostingView)
-
-        window.contentView = visualEffect
+        window.contentView = hostingView
         window.makeKeyAndOrderFront(nil)
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 900, height: 600)
@@ -122,17 +111,21 @@ struct GalleryContentView: View {
 
     @ViewBuilder
     private var detailView: some View {
-        switch selectedSection {
-        case .home:
-            HomeView()
-        case .explore:
-            ExploreView()
-        case .library:
-            LibraryView()
-        case .admin:
-            AdminView()
-        case .none:
-            HomeView()
+        Group {
+            switch selectedSection {
+            case .home:
+                HomeView()
+            case .explore:
+                ExploreView()
+            case .library:
+                LibraryView()
+            case .admin:
+                AdminView()
+            case .none:
+                HomeView()
+            }
         }
+        .scrollContentBackground(.hidden)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 }
