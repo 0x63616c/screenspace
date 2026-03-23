@@ -51,14 +51,7 @@ struct LibraryView: View {
 
     private func localVideoCard(url: URL) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.gray.opacity(0.3))
-                .aspectRatio(16/9, contentMode: .fit)
-                .overlay {
-                    Image(systemName: "play.circle")
-                        .font(.title)
-                        .foregroundStyle(.white.opacity(0.7))
-                }
+            LocalVideoThumbnail(url: url)
 
             Text(url.lastPathComponent)
                 .font(.caption)
@@ -93,5 +86,34 @@ struct LibraryView: View {
 
     private func setWallpaper(url: URL) {
         appState.setWallpaper(url: url, title: url.lastPathComponent)
+    }
+}
+
+private struct LocalVideoThumbnail: View {
+    let url: URL
+    @State private var thumbnail: NSImage?
+
+    var body: some View {
+        Group {
+            if let thumbnail {
+                Image(nsImage: thumbnail)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 112)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.3))
+                    .aspectRatio(16/9, contentMode: .fit)
+                    .overlay {
+                        Image(systemName: "play.circle")
+                            .font(.title)
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+            }
+        }
+        .task {
+            thumbnail = try? await ThumbnailGenerator.generateThumbnail(for: url)
+        }
     }
 }
