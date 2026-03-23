@@ -327,6 +327,76 @@ func TestAdminPromoteUser_Success(t *testing.T) {
 	}
 }
 
+func TestAdminBanUser_NotFound(t *testing.T) {
+	env := newTestAdminHandler(t)
+	admin := env.createUser(t, "admin-ban-notfound@example.com", "admin")
+
+	fakeID := "00000000-0000-0000-0000-000000000000"
+	w, r := env.authRequest(t, http.MethodPost, "/admin/users/"+fakeID+"/ban", "", admin.ID, "admin")
+	r.SetPathValue("id", fakeID)
+	env.handler.BanUser(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAdminUnbanUser_NotFound(t *testing.T) {
+	env := newTestAdminHandler(t)
+	admin := env.createUser(t, "admin-unban-notfound@example.com", "admin")
+
+	fakeID := "00000000-0000-0000-0000-000000000000"
+	w, r := env.authRequest(t, http.MethodPost, "/admin/users/"+fakeID+"/unban", "", admin.ID, "admin")
+	r.SetPathValue("id", fakeID)
+	env.handler.UnbanUser(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAdminPromoteUser_NotFound(t *testing.T) {
+	env := newTestAdminHandler(t)
+	admin := env.createUser(t, "admin-promote-notfound@example.com", "admin")
+
+	fakeID := "00000000-0000-0000-0000-000000000000"
+	w, r := env.authRequest(t, http.MethodPost, "/admin/users/"+fakeID+"/promote", "", admin.ID, "admin")
+	r.SetPathValue("id", fakeID)
+	env.handler.PromoteUser(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAdminReject_StoresReason(t *testing.T) {
+	env := newTestAdminHandler(t)
+	admin := env.createUser(t, "admin-reject-reason@example.com", "admin")
+	user := env.createUser(t, "uploader-reject-reason@example.com", "user")
+
+	wp := env.createWallpaperWithStatus(t, "Reject Reason WP", user.ID, "pending_review")
+
+	body := `{"reason":"too blurry"}`
+	w, r := env.authRequest(t, http.MethodPost, "/admin/wallpapers/"+wp.ID+"/reject", body, admin.ID, "admin")
+	r.SetPathValue("id", wp.ID)
+	env.handler.Reject(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	updated, err := env.wallpapers.GetByID(context.Background(), wp.ID)
+	if err != nil {
+		t.Fatalf("get wallpaper: %v", err)
+	}
+	if updated.Status != "rejected" {
+		t.Fatalf("expected rejected, got %s", updated.Status)
+	}
+	if updated.RejectionReason != "too blurry" {
+		t.Fatalf("expected rejection reason 'too blurry', got '%s'", updated.RejectionReason)
+	}
+}
+
 func TestAdminBanUser_NonAdmin(t *testing.T) {
 	env := newTestAdminHandler(t)
 	user := env.createUser(t, "nonadmin-ban@example.com", "user")

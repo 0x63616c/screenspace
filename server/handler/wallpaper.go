@@ -255,22 +255,23 @@ func (h *WallpaperHandler) Finalize(w http.ResponseWriter, r *http.Request) {
 }
 
 type wallpaperResponse struct {
-	ID            string   `json:"id"`
-	Title         string   `json:"title"`
-	UploaderID    string   `json:"uploader_id"`
-	Status        string   `json:"status"`
-	Category      string   `json:"category"`
-	Tags          []string `json:"tags"`
-	Resolution    string   `json:"resolution"`
-	Width         int      `json:"width"`
-	Height        int      `json:"height"`
-	Duration      float64  `json:"duration"`
-	FileSize      int64    `json:"file_size"`
-	Format        string   `json:"format"`
-	DownloadCount int64    `json:"download_count"`
-	DownloadURL   string   `json:"download_url,omitempty"`
-	CreatedAt     string   `json:"created_at"`
-	UpdatedAt     string   `json:"updated_at"`
+	ID              string   `json:"id"`
+	Title           string   `json:"title"`
+	UploaderID      string   `json:"uploader_id"`
+	Status          string   `json:"status"`
+	Category        string   `json:"category"`
+	Tags            []string `json:"tags"`
+	Resolution      string   `json:"resolution"`
+	Width           int      `json:"width"`
+	Height          int      `json:"height"`
+	Duration        float64  `json:"duration"`
+	FileSize        int64    `json:"file_size"`
+	Format          string   `json:"format"`
+	DownloadCount   int64    `json:"download_count"`
+	DownloadURL     string   `json:"download_url,omitempty"`
+	RejectionReason string   `json:"rejection_reason,omitempty"`
+	CreatedAt       string   `json:"created_at"`
+	UpdatedAt       string   `json:"updated_at"`
 }
 
 func wallpaperToResponse(w *repository.Wallpaper) wallpaperResponse {
@@ -279,21 +280,22 @@ func wallpaperToResponse(w *repository.Wallpaper) wallpaperResponse {
 		tags = []string{}
 	}
 	return wallpaperResponse{
-		ID:            w.ID,
-		Title:         w.Title,
-		UploaderID:    w.UploaderID,
-		Status:        w.Status,
-		Category:      w.Category,
-		Tags:          tags,
-		Resolution:    w.Resolution,
-		Width:         w.Width,
-		Height:        w.Height,
-		Duration:      w.Duration,
-		FileSize:      w.FileSize,
-		Format:        w.Format,
-		DownloadCount: w.DownloadCount,
-		CreatedAt:     w.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:     w.UpdatedAt.Format(time.RFC3339),
+		ID:              w.ID,
+		Title:           w.Title,
+		UploaderID:      w.UploaderID,
+		Status:          w.Status,
+		Category:        w.Category,
+		Tags:            tags,
+		Resolution:      w.Resolution,
+		Width:           w.Width,
+		Height:          w.Height,
+		Duration:        w.Duration,
+		FileSize:        w.FileSize,
+		Format:          w.Format,
+		DownloadCount:   w.DownloadCount,
+		RejectionReason: w.RejectionReason,
+		CreatedAt:       w.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:       w.UpdatedAt.Format(time.RFC3339),
 	}
 }
 

@@ -97,7 +97,7 @@ func (h *AdminHandler) Reject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.wallpapers.UpdateStatus(r.Context(), id, "rejected"); err != nil {
+	if err := h.wallpapers.UpdateStatus(r.Context(), id, "rejected", req.Reason); err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
@@ -230,6 +230,10 @@ func (h *AdminHandler) BanUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := r.PathValue("id")
+	if _, err := h.users.GetByID(r.Context(), id); err != nil {
+		http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
+		return
+	}
 	if err := h.users.SetBanned(r.Context(), id, true); err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
@@ -246,6 +250,10 @@ func (h *AdminHandler) UnbanUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := r.PathValue("id")
+	if _, err := h.users.GetByID(r.Context(), id); err != nil {
+		http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
+		return
+	}
 	if err := h.users.SetBanned(r.Context(), id, false); err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
@@ -262,6 +270,10 @@ func (h *AdminHandler) PromoteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := r.PathValue("id")
+	if _, err := h.users.GetByID(r.Context(), id); err != nil {
+		http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
+		return
+	}
 	if err := h.users.SetRole(r.Context(), id, "admin"); err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return

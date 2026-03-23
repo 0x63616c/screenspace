@@ -11,24 +11,25 @@ import (
 )
 
 type Wallpaper struct {
-	ID            string
-	Title         string
-	UploaderID    string
-	Status        string
-	Category      string
-	Tags          []string
-	Resolution    string
-	Width         int
-	Height        int
-	Duration      float64
-	FileSize      int64
-	Format        string
-	DownloadCount int64
-	StorageKey    string
-	ThumbnailKey  string
-	PreviewKey    string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID              string
+	Title           string
+	UploaderID      string
+	Status          string
+	Category        string
+	Tags            []string
+	Resolution      string
+	Width           int
+	Height          int
+	Duration        float64
+	FileSize        int64
+	Format          string
+	DownloadCount   int64
+	StorageKey      string
+	ThumbnailKey    string
+	PreviewKey      string
+	RejectionReason string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 type CreateParams struct {
@@ -68,11 +69,13 @@ func NewWallpaperRepo(db *sql.DB) *WallpaperRepo {
 
 func scanWallpaper(row interface{ Scan(...any) error }) (*Wallpaper, error) {
 	w := &Wallpaper{}
+	var rejectionReason sql.NullString
 	err := row.Scan(
 		&w.ID, &w.Title, &w.UploaderID, &w.Status, &w.Category,
 		pq.Array(&w.Tags), &w.Resolution, &w.Width, &w.Height,
 		&w.Duration, &w.FileSize, &w.Format, &w.DownloadCount,
 		&w.StorageKey, &w.ThumbnailKey, &w.PreviewKey,
+		&rejectionReason,
 		&w.CreatedAt, &w.UpdatedAt,
 	)
 	if err != nil {
@@ -81,10 +84,13 @@ func scanWallpaper(row interface{ Scan(...any) error }) (*Wallpaper, error) {
 	if w.Tags == nil {
 		w.Tags = []string{}
 	}
+	if rejectionReason.Valid {
+		w.RejectionReason = rejectionReason.String
+	}
 	return w, nil
 }
 
-const wallpaperColumns = `id, title, uploader_id, status, COALESCE(category, ''), tags, resolution, width, height, duration, file_size, format, download_count, storage_key, thumbnail_key, preview_key, created_at, updated_at`
+const wallpaperColumns = `id, title, uploader_id, status, COALESCE(category, ''), tags, resolution, width, height, duration, file_size, format, download_count, storage_key, thumbnail_key, preview_key, rejection_reason, created_at, updated_at`
 
 func (r *WallpaperRepo) Create(ctx context.Context, p CreateParams) (*Wallpaper, error) {
 	row := r.db.QueryRowContext(ctx,
@@ -180,7 +186,17 @@ func (r *WallpaperRepo) List(ctx context.Context, p ListParams) ([]*Wallpaper, i
 	return wallpapers, total, nil
 }
 
-func (r *WallpaperRepo) UpdateStatus(ctx context.Context, id, status string) error {
+func (r *WallpaperRepo) UpdateStatus(ctx context.Context, id, status string, reason ...string) error {
+	if len(reason) > 0 && reason[0] != "" {
+		_, err := r.db.ExecContext(ctx,
+			`UPDATE wallpapers SET status = $1, rejection_reason = $2, updated_at = now() WHERE id = $3`,
+			status, reason[0], id,
+		)
+		if err != nil {
+			return fmt.Errorf("update status: %w", err)
+		}
+		return nil
+	}
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE wallpapers SET status = $1, updated_at = now() WHERE id = $2`,
 		status, id,
