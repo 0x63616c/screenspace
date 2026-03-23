@@ -1,3 +1,4 @@
+import AVKit
 import SwiftUI
 
 struct DetailView: View {
@@ -13,7 +14,12 @@ struct DetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 // Video preview area
-                ZStack {
+                if let previewURLString = wallpaper.previewURL,
+                   let previewURL = URL(string: previewURLString) {
+                    VideoPreview(url: previewURL)
+                        .aspectRatio(16/9, contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.black)
                         .aspectRatio(16/9, contentMode: .fit)
@@ -177,6 +183,31 @@ struct DetailView: View {
             isDownloading = false
         }
     }
+}
+
+struct VideoPreview: NSViewRepresentable {
+    let url: URL
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = AVPlayerView()
+        view.controlsStyle = .inline
+        view.showsFullScreenToggleButton = false
+        let player = AVPlayer(url: url)
+        player.isMuted = true
+        view.player = player
+        player.play()
+        NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: player.currentItem,
+            queue: .main
+        ) { _ in
+            player.seek(to: .zero)
+            player.play()
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: AVPlayerView, context: Context) {}
 }
 
 // Simple flow layout for tags
