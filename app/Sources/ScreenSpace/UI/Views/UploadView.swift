@@ -117,7 +117,12 @@ struct UploadView: View {
 
             // Step 2: Upload file to pre-signed URL
             uploadProgress = 0.3
-            var uploadRequest = URLRequest(url: URL(string: initResponse.uploadURL)!)
+            guard let uploadURL = URL(string: initResponse.uploadURL) else {
+                errorMessage = "Invalid upload URL from server"
+                isUploading = false
+                return
+            }
+            var uploadRequest = URLRequest(url: uploadURL)
             uploadRequest.httpMethod = "PUT"
             uploadRequest.setValue("video/mp4", forHTTPHeaderField: "Content-Type")
             let fileData = try Data(contentsOf: fileURL)

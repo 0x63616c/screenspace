@@ -5,6 +5,7 @@ struct LibraryView: View {
     @Environment(AppState.self) var appState
     @State private var localVideos: [URL] = []
     @State private var isDragOver = false
+    @State private var importError: String?
 
     var body: some View {
         ScrollView {
@@ -29,6 +30,16 @@ struct LibraryView: View {
             .padding(.vertical)
         }
         .onAppear { loadLibrary() }
+        .alert("Import Error", isPresented: Binding(
+            get: { importError != nil },
+            set: { if !$0 { importError = nil } }
+        )) {
+            Button("OK") { importError = nil }
+        } message: {
+            if let importError {
+                Text(importError)
+            }
+        }
     }
 
     private var dropZone: some View {
@@ -75,9 +86,14 @@ struct LibraryView: View {
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
                 guard let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
                 guard VideoImporter.isValidVideo(url: url) else { return }
-                if let imported = try? VideoImporter.importVideo(from: url, to: VideoImporter.libraryDirectory()) {
+                do {
+                    let imported = try VideoImporter.importVideo(from: url, to: VideoImporter.libraryDirectory())
                     DispatchQueue.main.async {
                         localVideos.append(imported)
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        importError = "Failed to import \(url.lastPathComponent): \(error.localizedDescription)"
                     }
                 }
             }
