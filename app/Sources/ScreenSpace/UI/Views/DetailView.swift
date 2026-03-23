@@ -9,6 +9,7 @@ struct DetailView: View {
     @State private var isFavorited = false
     @State private var showReportSheet = false
     @State private var reportReason = ""
+    @State private var errorMessage: String?
 
     var body: some View {
         ScrollView {
@@ -142,6 +143,7 @@ struct DetailView: View {
             .padding()
             .frame(width: 350)
         }
+        .errorAlert(message: $errorMessage)
     }
 
     private var formattedSize: String {
@@ -156,10 +158,14 @@ struct DetailView: View {
     private func setAsLockScreen() {
         Task {
             guard let cached = CacheManager.shared.cachedURL(for: wallpaper.id) else {
+                errorMessage = "Download the wallpaper first before setting it as lock screen."
                 return
             }
-            let lockScreenManager = appState.lockScreen
-            try? await lockScreenManager.setLockScreen(from: cached)
+            do {
+                try await appState.lockScreen.setLockScreen(from: cached)
+            } catch {
+                errorMessage = "Failed to set lock screen: \(error.localizedDescription)"
+            }
         }
     }
 
@@ -181,7 +187,7 @@ struct DetailView: View {
                 let cachedURL = try CacheManager.shared.cacheFile(from: tempURL, wallpaperID: wallpaper.id)
                 appState.setWallpaper(url: cachedURL, title: wallpaper.title)
             } catch {
-                // Download failed silently for now
+                errorMessage = "Download failed: \(error.localizedDescription)"
             }
 
             isDownloading = false
