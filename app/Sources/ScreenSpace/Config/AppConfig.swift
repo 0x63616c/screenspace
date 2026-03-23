@@ -32,7 +32,11 @@ struct AppConfig: Codable, Equatable {
         videoQuality: "original",
         videoGravity: .resizeAspectFill,
         cacheSizeLimitMB: 5120,
+        #if DEBUG
+        serverURL: "http://localhost:8080",
+        #else
         serverURL: "https://api.screenspace.app",
+        #endif
         screenAssignments: [:],
         lastPlayedURL: nil
     )
