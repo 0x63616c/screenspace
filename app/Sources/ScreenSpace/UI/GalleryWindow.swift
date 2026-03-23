@@ -54,6 +54,7 @@ enum GallerySection: String, CaseIterable, Identifiable {
 }
 
 struct GalleryContentView: View {
+    @Environment(AppState.self) var appState
     @State private var selectedSection: GallerySection? = .home
     @State private var showSettings = false
     @State private var showUpload = false
@@ -100,9 +101,11 @@ struct GalleryContentView: View {
                     .tag(GallerySection.library)
             }
 
-            Section("Manage") {
-                Label("Admin", systemImage: "shield")
-                    .tag(GallerySection.admin)
+            if appState.isAdmin {
+                Section("Manage") {
+                    Label("Admin", systemImage: "shield")
+                        .tag(GallerySection.admin)
+                }
             }
         }
         .listStyle(.sidebar)
