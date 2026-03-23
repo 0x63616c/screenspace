@@ -43,6 +43,7 @@ enum GalleryTab: String, CaseIterable {
 struct GalleryContentView: View {
     @State private var selectedTab: GalleryTab = .home
     @State private var showSettings = false
+    @State private var showUpload = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -63,7 +64,7 @@ struct GalleryContentView: View {
 
                 Spacer()
 
-                Button("Upload") { }
+                Button("Upload") { showUpload = true }
                     .buttonStyle(.bordered)
 
                 Button(action: { showSettings = true }) {
@@ -88,6 +89,9 @@ struct GalleryContentView: View {
         .frame(minWidth: 800, minHeight: 600)
         .sheet(isPresented: $showSettings) {
             SettingsView()
+        }
+        .sheet(isPresented: $showUpload) {
+            UploadView()
         }
     }
 }
