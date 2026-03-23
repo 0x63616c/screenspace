@@ -72,7 +72,7 @@ struct LibraryView: View {
             Button("Set as Wallpaper") {
                 setWallpaper(url: url)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.borderedProminent)
             .controlSize(.small)
         }
         .frame(width: 200)
