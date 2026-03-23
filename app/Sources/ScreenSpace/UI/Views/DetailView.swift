@@ -192,6 +192,10 @@ struct DetailView: View {
 struct VideoPreview: NSViewRepresentable {
     let url: URL
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func makeNSView(context: Context) -> AVPlayerView {
         let view = AVPlayerView()
         view.controlsStyle = .inline
@@ -200,7 +204,7 @@ struct VideoPreview: NSViewRepresentable {
         player.isMuted = true
         view.player = player
         player.play()
-        NotificationCenter.default.addObserver(
+        let observer = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: player.currentItem,
             queue: .main
@@ -208,10 +212,22 @@ struct VideoPreview: NSViewRepresentable {
             player.seek(to: .zero)
             player.play()
         }
+        context.coordinator.observer = observer
         return view
     }
 
     func updateNSView(_ nsView: AVPlayerView, context: Context) {}
+
+    static func dismantleNSView(_ nsView: AVPlayerView, coordinator: Coordinator) {
+        nsView.player?.pause()
+        if let observer = coordinator.observer {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    class Coordinator {
+        var observer: NSObjectProtocol?
+    }
 }
 
 // Simple flow layout for tags
