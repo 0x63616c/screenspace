@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -127,11 +128,13 @@ func (h *WallpaperHandler) Create(w http.ResponseWriter, r *http.Request) {
 		h.wallpapers.UpdateMetadata(r.Context(), wp.ID, req.Title, req.Category, tags)
 	}
 
-	uploadURL, err := h.store.PreSignedUploadURL(r.Context(), actualKey, 15*time.Minute)
+	uploadURL, err := h.store.PreSignedUploadURL(r.Context(), actualKey, 2*time.Hour)
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
+
+	slog.Info("wallpaper uploaded", "user_id", claims.UserID, "wallpaper_id", wp.ID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

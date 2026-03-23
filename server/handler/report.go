@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -74,6 +75,8 @@ func (h *ReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
+
+	slog.Info("wallpaper reported", "reporter_id", claims.UserID, "wallpaper_id", wallpaperID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

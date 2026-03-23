@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -69,11 +70,14 @@ func (h *AdminHandler) Approve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claims := claimsFromRequest(r)
 	id := r.PathValue("id")
 	if err := h.wallpapers.UpdateStatus(r.Context(), id, "approved"); err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
+
+	slog.Info("wallpaper approved", "admin_id", claims.UserID, "wallpaper_id", id, "action", "approve")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "approved"})
@@ -101,6 +105,9 @@ func (h *AdminHandler) Reject(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
+
+	claims := claimsFromRequest(r)
+	slog.Info("wallpaper rejected", "admin_id", claims.UserID, "wallpaper_id", id, "action", "reject")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "rejected"})
@@ -239,6 +246,9 @@ func (h *AdminHandler) BanUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claims := claimsFromRequest(r)
+	slog.Info("user banned", "admin_id", claims.UserID, "target_user_id", id, "action", "ban")
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "banned"})
 }
@@ -259,6 +269,9 @@ func (h *AdminHandler) UnbanUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claims := claimsFromRequest(r)
+	slog.Info("user unbanned", "admin_id", claims.UserID, "target_user_id", id, "action", "unban")
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "unbanned"})
 }
@@ -278,6 +291,9 @@ func (h *AdminHandler) PromoteUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
+
+	claims := claimsFromRequest(r)
+	slog.Info("user promoted", "admin_id", claims.UserID, "target_user_id", id)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "promoted"})
@@ -321,11 +337,14 @@ func (h *AdminHandler) DismissReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claims := claimsFromRequest(r)
 	id := r.PathValue("id")
 	if err := h.reports.Dismiss(r.Context(), id); err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
+
+	slog.Info("report dismissed", "admin_id", claims.UserID, "report_id", id)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "dismissed"})
