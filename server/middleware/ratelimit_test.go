@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestRateLimiter_AllowsUnderLimit(t *testing.T) {
@@ -56,6 +57,67 @@ func TestRateLimiter_SeparateKeys(t *testing.T) {
 	}
 	if rl.Allow("user-a") {
 		t.Fatal("expected block for user-a")
+	}
+}
+
+func TestRateLimiter_CleansUpStaleEntries(t *testing.T) {
+	rl := NewRateLimiter(5)
+
+	// Add some entries
+	for i := 0; i < 10; i++ {
+		rl.Allow("stale-user-" + string(rune('a'+i)))
+	}
+
+	// Verify entries exist
+	rl.mu.Lock()
+	if len(rl.limits) != 10 {
+		t.Fatalf("expected 10 entries, got %d", len(rl.limits))
+	}
+
+	// Make all entries stale (25 hours old)
+	for _, l := range rl.limits {
+		l.lastReset = time.Now().Add(-25 * time.Hour)
+	}
+	rl.mu.Unlock()
+
+	// Trigger cleanup by making 100 calls with a new key
+	for i := 0; i < 100; i++ {
+		rl.Allow("trigger-cleanup")
+	}
+
+	// Verify stale entries were removed
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	// Only "trigger-cleanup" should remain
+	if len(rl.limits) != 1 {
+		t.Fatalf("expected 1 entry after cleanup, got %d", len(rl.limits))
+	}
+	if _, exists := rl.limits["trigger-cleanup"]; !exists {
+		t.Fatal("expected trigger-cleanup entry to exist")
+	}
+}
+
+func TestRateLimiter_CleansUpByTime(t *testing.T) {
+	rl := NewRateLimiter(5)
+
+	rl.Allow("old-user")
+
+	// Make entry stale and force time-based cleanup
+	rl.mu.Lock()
+	rl.limits["old-user"].lastReset = time.Now().Add(-25 * time.Hour)
+	rl.lastCleanup = time.Now().Add(-6 * time.Minute)
+	rl.mu.Unlock()
+
+	// Single call should trigger time-based cleanup
+	rl.Allow("new-user")
+
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	if _, exists := rl.limits["old-user"]; exists {
+		t.Fatal("expected old-user to be cleaned up")
+	}
+	if _, exists := rl.limits["new-user"]; !exists {
+		t.Fatal("expected new-user to exist")
 	}
 }
 
