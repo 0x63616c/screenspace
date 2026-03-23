@@ -31,9 +31,9 @@ struct DetailView: View {
                             Text(category.capitalized)
                                 .font(.caption)
                                 .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(.blue.opacity(0.2))
-                                .cornerRadius(4)
+                                .padding(.vertical, 4)
+                                .background(.quaternary)
+                                .clipShape(Capsule())
                         }
 
                         HStack(spacing: 16) {
@@ -49,11 +49,11 @@ struct DetailView: View {
                             FlowLayout(spacing: 4) {
                                 ForEach(tags, id: \.self) { tag in
                                     Text(tag)
-                                        .font(.caption2)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(.secondary.opacity(0.2))
-                                        .cornerRadius(4)
+                                        .font(.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(.quaternary)
+                                        .clipShape(Capsule())
                                 }
                             }
                         }
@@ -63,6 +63,7 @@ struct DetailView: View {
                                 Label("Set as Wallpaper", systemImage: "photo.on.rectangle")
                             }
                             .buttonStyle(.borderedProminent)
+                            .controlSize(.regular)
 
                             if isDownloading {
                                 ProgressView(value: downloadProgress)
@@ -73,11 +74,13 @@ struct DetailView: View {
                                 Image(systemName: "heart")
                             }
                             .buttonStyle(.bordered)
+                            .controlSize(.regular)
 
                             Button(action: {}) {
                                 Image(systemName: "flag")
                             }
                             .buttonStyle(.bordered)
+                            .controlSize(.regular)
                         }
                     }
                     .padding()

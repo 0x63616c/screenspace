@@ -38,30 +38,3 @@ struct GlassCard<Content: View>: View {
             .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
     }
 }
-
-/// Floating action button with glass material
-struct GlassButton: View {
-    let title: String
-    let icon: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Label(title, systemImage: icon)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-        }
-        .buttonStyle(.plain)
-        .background {
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    Capsule()
-                        .strokeBorder(.white.opacity(0.2), lineWidth: 0.5)
-                }
-        }
-        .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
-    }
-}

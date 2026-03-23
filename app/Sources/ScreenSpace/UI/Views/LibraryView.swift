@@ -17,7 +17,7 @@ struct LibraryView: View {
                     dropZone
                 } else {
                     dropZone
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 180))], spacing: 12) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 200))], spacing: 12) {
                         ForEach(localVideos, id: \.absoluteString) { url in
                             localVideoCard(url: url)
                         }
@@ -31,29 +31,26 @@ struct LibraryView: View {
     }
 
     private var dropZone: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8]))
-            .foregroundStyle(isDragOver ? .blue : .secondary)
-            .frame(height: 120)
-            .overlay {
-                VStack(spacing: 8) {
-                    Image(systemName: "arrow.down.doc")
-                        .font(.title)
-                    Text("Drop MP4 or MOV files here")
-                        .font(.caption)
-                }
-                .foregroundStyle(isDragOver ? .blue : .secondary)
-            }
-            .onDrop(of: [.fileURL], isTargeted: $isDragOver) { providers in
-                handleDrop(providers)
-                return true
-            }
-            .padding(.horizontal)
+        VStack(spacing: 8) {
+            Image(systemName: "arrow.down.doc")
+                .font(.title)
+            Text("Drop MP4 or MOV files here")
+                .font(.caption)
+        }
+        .foregroundStyle(isDragOver ? .blue : .secondary)
+        .frame(maxWidth: .infinity)
+        .frame(height: 120)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+        .onDrop(of: [.fileURL], isTargeted: $isDragOver) { providers in
+            handleDrop(providers)
+            return true
+        }
+        .padding(.horizontal)
     }
 
     private func localVideoCard(url: URL) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 12)
                 .fill(Color.gray.opacity(0.3))
                 .aspectRatio(16/9, contentMode: .fit)
                 .overlay {
@@ -72,7 +69,7 @@ struct LibraryView: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
         }
-        .frame(width: 180)
+        .frame(width: 200)
     }
 
     private func loadLibrary() {

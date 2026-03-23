@@ -1,7 +1,14 @@
 import SwiftUI
 
 struct AdminView: View {
-    @State private var selectedTab = 0
+    enum AdminTab: String, CaseIterable {
+        case queue = "Queue"
+        case content = "Content"
+        case users = "Users"
+        case reports = "Reports"
+    }
+
+    @State private var selectedTab: AdminTab = .queue
     @State private var pendingWallpapers: [WallpaperResponse] = []
     @State private var users: [UserResponse] = []
     @State private var reports: [ReportResponse] = []
@@ -12,13 +19,26 @@ struct AdminView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $selectedTab) {
-                Text("Queue").tag(0)
-                Text("Content").tag(1)
-                Text("Users").tag(2)
-                Text("Reports").tag(3)
+            // Tab bar
+            HStack(spacing: 0) {
+                ForEach(AdminTab.allCases, id: \.self) { tab in
+                    Button(action: { selectedTab = tab }) {
+                        Text(tab.rawValue)
+                            .font(.subheadline)
+                            .fontWeight(selectedTab == tab ? .semibold : .regular)
+                            .foregroundStyle(selectedTab == tab ? .primary : .secondary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.plain)
+                    .background {
+                        if selectedTab == tab {
+                            Capsule()
+                                .fill(.quaternary)
+                        }
+                    }
+                }
             }
-            .pickerStyle(.segmented)
             .padding()
 
             if let error = errorMessage {
@@ -29,11 +49,10 @@ struct AdminView: View {
             }
 
             switch selectedTab {
-            case 0: queueView
-            case 1: contentView
-            case 2: usersView
-            case 3: reportsView
-            default: EmptyView()
+            case .queue: queueView
+            case .content: contentView
+            case .users: usersView
+            case .reports: reportsView
             }
         }
         .task { await loadQueue() }
@@ -83,9 +102,11 @@ struct AdminView: View {
                 Spacer()
                 if user.banned == true {
                     Button("Unban") { Task { await unban(user.id) } }
+                        .buttonStyle(.bordered)
                         .controlSize(.small)
                 } else {
                     Button("Ban") { Task { await ban(user.id) } }
+                        .buttonStyle(.bordered)
                         .controlSize(.small)
                 }
             }
@@ -104,6 +125,7 @@ struct AdminView: View {
                 }
                 Spacer()
                 Button("Dismiss") { Task { await dismissReport(report.id) } }
+                    .buttonStyle(.bordered)
                     .controlSize(.small)
             }
         }

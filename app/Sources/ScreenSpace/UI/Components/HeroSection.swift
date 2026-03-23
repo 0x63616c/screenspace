@@ -33,7 +33,7 @@ struct HeroSection: View {
                     .foregroundStyle(.white.opacity(0.6))
 
                 Text(wallpaper?.title ?? "No wallpapers yet")
-                    .font(.system(size: 28, weight: .bold, design: .default))
+                    .font(.title.bold())
                     .foregroundStyle(.white)
 
                 if let wp = wallpaper {
@@ -48,28 +48,15 @@ struct HeroSection: View {
                 HStack(spacing: 10) {
                     Button(action: {}) {
                         Label("View Wallpaper", systemImage: "play.fill")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
                     }
-                    .buttonStyle(.plain)
-                    .background {
-                        Capsule().fill(.white)
-                    }
-                    .foregroundStyle(.black)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
 
                     Button(action: {}) {
                         Image(systemName: "heart")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .padding(8)
                     }
-                    .buttonStyle(.plain)
-                    .background {
-                        Circle().fill(.ultraThinMaterial)
-                    }
-                    .foregroundStyle(.white)
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
                 }
                 .padding(.top, 4)
             }

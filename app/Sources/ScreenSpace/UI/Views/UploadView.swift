@@ -75,9 +75,11 @@ struct UploadView: View {
             HStack {
                 Button("Cancel") { dismiss() }
                     .buttonStyle(.bordered)
+                    .controlSize(.regular)
 
                 Button("Upload") { Task { await upload() } }
                     .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
                     .disabled(!canUpload)
             }
         }
