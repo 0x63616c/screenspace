@@ -40,6 +40,7 @@ enum GallerySection: String, CaseIterable, Identifiable {
     case explore = "Explore"
     case library = "Library"
     case favorites = "Favorites"
+    case playlists = "Playlists"
     case admin = "Admin"
 
     var id: String { rawValue }
@@ -50,6 +51,7 @@ enum GallerySection: String, CaseIterable, Identifiable {
         case .explore: return "safari"
         case .library: return "square.stack"
         case .favorites: return "heart"
+        case .playlists: return "music.note.list"
         case .admin: return "shield"
         }
     }
@@ -111,6 +113,8 @@ struct GalleryContentView: View {
             Section("Your Stuff") {
                 Label("Library", systemImage: "square.stack")
                     .tag(GallerySection.library)
+                Label("Playlists", systemImage: "music.note.list")
+                    .tag(GallerySection.playlists)
                 if appState.isLoggedIn {
                     Label("Favorites", systemImage: "heart")
                         .tag(GallerySection.favorites)
@@ -140,6 +144,8 @@ struct GalleryContentView: View {
                 LibraryView()
             case .favorites:
                 FavoritesView()
+            case .playlists:
+                PlaylistsView()
             case .admin:
                 AdminView()
             case .none:
