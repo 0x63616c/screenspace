@@ -1,31 +1,74 @@
 import SwiftUI
 
+extension WallpaperResponse {
+    func toCardData() -> WallpaperCardData {
+        WallpaperCardData(
+            id: id,
+            title: title,
+            thumbnailURL: thumbnailURL.flatMap { URL(string: $0) },
+            width: width,
+            height: height,
+            duration: duration
+        )
+    }
+}
+
 struct HomeView: View {
     @Environment(AppState.self) var appState
+    @State private var popular: [WallpaperCardData] = []
+    @State private var recent: [WallpaperCardData] = []
+    @State private var featured: WallpaperCardData?
+    @State private var isLoading = true
+    @State private var loadError: String?
     @State private var selectedWallpaper: WallpaperResponse?
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                HeroSection(wallpaper: Self.placeholderData.first)
-                    .padding(.horizontal, 20)
+            if isLoading {
+                VStack {
+                    Spacer(minLength: 100)
+                    ProgressView("Loading wallpapers...")
+                    Spacer(minLength: 100)
+                }
+                .frame(maxWidth: .infinity)
+            } else {
+                VStack(alignment: .leading, spacing: 28) {
+                    if let error = loadError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 20)
+                    }
 
-                ShelfRow(title: "Popular", wallpapers: Self.placeholderData, onSelectWallpaper: { data in
-                    fetchAndShow(id: data.id)
-                })
-                ShelfRow(title: "Recently Added", wallpapers: Self.placeholderData, onSelectWallpaper: { data in
-                    fetchAndShow(id: data.id)
-                })
-                ShelfRow(title: "Nature", wallpapers: Self.placeholderData, onSelectWallpaper: { data in
-                    fetchAndShow(id: data.id)
-                })
-                ShelfRow(title: "Abstract", wallpapers: Self.placeholderData, onSelectWallpaper: { data in
-                    fetchAndShow(id: data.id)
-                })
+                    HeroSection(wallpaper: featured)
+                        .padding(.horizontal, 20)
+
+                    ShelfRow(title: "Popular", wallpapers: popular, onSelectWallpaper: { data in
+                        fetchAndShow(id: data.id)
+                    })
+                    ShelfRow(title: "Recently Added", wallpapers: recent, onSelectWallpaper: { data in
+                        fetchAndShow(id: data.id)
+                    })
+                }
+                .padding(.vertical, 20)
             }
-            .padding(.vertical, 20)
         }
         .scrollContentBackground(.hidden)
+        .task {
+            do {
+                let pop = try await appState.api.popularWallpapers(limit: 10)
+                let rec = try await appState.api.recentWallpapers(limit: 10)
+                popular = pop.wallpapers.map { $0.toCardData() }
+                recent = rec.wallpapers.map { $0.toCardData() }
+                featured = popular.first
+            } catch {
+                loadError = "Connect to a server in Settings to browse community wallpapers."
+                popular = Self.placeholderData
+                recent = Self.placeholderData
+                featured = Self.placeholderData.first
+            }
+            isLoading = false
+        }
         .sheet(item: $selectedWallpaper) { wp in
             DetailView(wallpaper: wp)
         }
@@ -37,7 +80,7 @@ struct HomeView: View {
         }
     }
 
-    static let placeholderData: [WallpaperCardData] = (0..<8).map { i in
+    private static let placeholderData: [WallpaperCardData] = (0..<8).map { i in
         WallpaperCardData(
             id: "\(i)",
             title: ["Sea Cliffs", "Mountain Dawn", "City Lights", "Northern Lights", "Ocean Waves", "Forest Rain", "Desert Storm", "Sunset Beach"][i],
