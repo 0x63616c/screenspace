@@ -60,8 +60,18 @@ func (a *AuthService) ValidateToken(tokenStr string) (*TokenClaims, error) {
 		return nil, fmt.Errorf("invalid token claims")
 	}
 
+	sub, ok := claims["sub"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid token: missing or non-string 'sub' claim")
+	}
+
+	role, ok := claims["role"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid token: missing or non-string 'role' claim")
+	}
+
 	return &TokenClaims{
-		UserID: claims["sub"].(string),
-		Role:   claims["role"].(string),
+		UserID: sub,
+		Role:   role,
 	}, nil
 }

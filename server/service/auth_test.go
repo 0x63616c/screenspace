@@ -1,6 +1,11 @@
 package service
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+)
 
 func TestHashAndVerifyPassword(t *testing.T) {
 	auth := NewAuthService("test-secret")
@@ -57,5 +62,48 @@ func TestValidateToken_WrongSecret(t *testing.T) {
 	_, err := auth2.ValidateToken(token)
 	if err == nil {
 		t.Error("expected error for wrong secret")
+	}
+}
+
+func TestValidateToken_MissingSub(t *testing.T) {
+	auth := NewAuthService("test-secret")
+
+	// Create a token with no "sub" claim
+	claims := jwt.MapClaims{
+		"role": "admin",
+		"exp":  time.Now().Add(time.Hour).Unix(),
+		"iat":  time.Now().Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenStr, err := token.SignedString([]byte("test-secret"))
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+
+	_, err = auth.ValidateToken(tokenStr)
+	if err == nil {
+		t.Error("expected error for missing sub claim")
+	}
+}
+
+func TestValidateToken_WrongTypeRole(t *testing.T) {
+	auth := NewAuthService("test-secret")
+
+	// Create a token with role as int instead of string
+	claims := jwt.MapClaims{
+		"sub":  "user-123",
+		"role": 42,
+		"exp":  time.Now().Add(time.Hour).Unix(),
+		"iat":  time.Now().Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenStr, err := token.SignedString([]byte("test-secret"))
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+
+	_, err = auth.ValidateToken(tokenStr)
+	if err == nil {
+		t.Error("expected error for non-string role claim")
 	}
 }
