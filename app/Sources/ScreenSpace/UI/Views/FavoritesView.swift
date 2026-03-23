@@ -16,18 +16,11 @@ struct FavoritesView: View {
                 if isLoading {
                     ProgressView().frame(maxWidth: .infinity)
                 } else if favorites.isEmpty {
-                    VStack(spacing: Spacing.sm) {
-                        Image(systemName: "heart")
-                            .font(.title)
-                            .foregroundStyle(.secondary)
-                        Text("No favorites yet")
-                            .foregroundStyle(.secondary)
-                        Text("Tap the heart icon on any wallpaper to save it here.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 40)
+                    EmptyStateView(
+                        icon: "heart",
+                        title: "No favorites yet",
+                        subtitle: "Tap the heart icon on any wallpaper to save it here."
+                    )
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 200))], spacing: Spacing.md) {
                         ForEach(favorites) { wp in

@@ -30,18 +30,11 @@ struct PlaylistsView: View {
                 .padding(.horizontal)
 
                 if playlists.isEmpty {
-                    VStack(spacing: Spacing.sm) {
-                        Image(systemName: "music.note.list")
-                            .font(.title)
-                            .foregroundStyle(.secondary)
-                        Text("No playlists yet")
-                            .foregroundStyle(.secondary)
-                        Text("Create a playlist to rotate wallpapers automatically.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 40)
+                    EmptyStateView(
+                        icon: "music.note.list",
+                        title: "No playlists yet",
+                        subtitle: "Create a playlist to rotate wallpapers automatically."
+                    )
                 } else {
                     ForEach(playlists) { playlist in
                         playlistCard(playlist)
