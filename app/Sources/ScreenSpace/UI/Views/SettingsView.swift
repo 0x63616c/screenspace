@@ -98,18 +98,29 @@ struct SettingsView: View {
             ForEach(NSScreen.screens, id: \.self) { screen in
                 let displayID = DisplayIdentifier.stableID(for: screen)
                 let name = screen.localizedName
+
                 HStack {
-                    Text(name)
+                    VStack(alignment: .leading) {
+                        Text(name)
+                            .font(.body)
+                    }
                     Spacer()
-                    Text(displayID)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+
+                    Picker("Playlist", selection: Binding(
+                        get: { config.screenAssignments[displayID] ?? "" },
+                        set: { newValue in
+                            config.screenAssignments[displayID] = newValue.isEmpty ? nil : newValue
+                            saveConfig()
+                        }
+                    )) {
+                        Text("None").tag("")
+                        ForEach(appState.playlistManager.playlists) { playlist in
+                            Text(playlist.name).tag(playlist.id)
+                        }
+                    }
+                    .frame(width: 150)
                 }
             }
-
-            Text("Assign wallpapers to specific displays from the Library tab.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
         }
     }
 
