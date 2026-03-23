@@ -4,10 +4,14 @@ struct ResolutionBadge: View {
     let width: Int
     let height: Int
 
-    private var label: String {
+    static func label(for width: Int, height: Int) -> String {
         if width >= 3840 || height >= 2160 { return "4K" }
         if width >= 2560 || height >= 1440 { return "2K" }
         return "1080p"
+    }
+
+    private var label: String {
+        Self.label(for: width, height: height)
     }
 
     var body: some View {
@@ -24,5 +28,6 @@ struct ResolutionBadge: View {
                             .strokeBorder(.white.opacity(0.2), lineWidth: 0.5)
                     }
             }
+            .accessibilityLabel("Resolution: \(label)")
     }
 }

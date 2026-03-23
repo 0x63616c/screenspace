@@ -58,6 +58,7 @@ struct LibraryView: View {
             return true
         }
         .padding(.horizontal)
+        .accessibilityLabel("Drop zone for video files. Drop MP4 or MOV files here to add to your library.")
     }
 
     private func localVideoCard(url: URL) -> some View {

@@ -48,9 +48,13 @@ struct DetailView: View {
 
                         HStack(spacing: 16) {
                             Label(wallpaper.resolution, systemImage: "rectangle.on.rectangle")
+                                .accessibilityLabel("Resolution: \(wallpaper.resolution)")
                             Label(formattedSize, systemImage: "doc")
+                                .accessibilityLabel("File size: \(formattedSize)")
                             Label(formattedDuration, systemImage: "clock")
+                                .accessibilityLabel("Duration: \(formattedDuration)")
                             Label("\(wallpaper.downloadCount) downloads", systemImage: "arrow.down.circle")
+                                .accessibilityLabel("\(wallpaper.downloadCount) downloads")
                         }
                         .font(.caption)
                         .foregroundStyle(.secondary)

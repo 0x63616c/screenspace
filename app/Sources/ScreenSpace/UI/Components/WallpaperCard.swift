@@ -82,5 +82,8 @@ struct WallpaperCard: View {
         .frame(width: 200)
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(data.title), \(ResolutionBadge.label(for: data.width, height: data.height)), \(data.durationLabel)")
+        .accessibilityAddTraits(.isButton)
     }
 }

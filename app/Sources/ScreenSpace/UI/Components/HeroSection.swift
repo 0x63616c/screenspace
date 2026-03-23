@@ -53,12 +53,14 @@ struct HeroSection: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.regular)
+                    .accessibilityLabel("Set featured wallpaper as desktop wallpaper")
 
                     Button(action: { onFavorite?() }) {
                         Image(systemName: "heart")
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
+                    .accessibilityLabel("Add featured wallpaper to favorites")
                 }
                 .padding(.top, 4)
             }
