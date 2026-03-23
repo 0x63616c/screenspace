@@ -5,14 +5,14 @@ import SwiftUI
 final class GalleryWindowController {
     private var window: NSWindow?
 
-    func show() {
+    func show(appState: AppState) {
         if let window = window {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
 
-        let contentView = GalleryContentView()
+        let contentView = GalleryContentView().environment(appState)
         let hostingView = NSHostingView(rootView: contentView)
 
         let window = NSWindow(

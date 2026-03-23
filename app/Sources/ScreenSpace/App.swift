@@ -15,9 +15,10 @@ struct ScreenSpaceApp: App {
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
+    let appState = AppState()
     private let galleryController = GalleryWindowController()
-    private let engine = WallpaperEngine()
     private var isPaused = false
+    private var nowPlayingItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -32,8 +33,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusItem?.menu = buildMenu()
 
-        engine.start()
-        galleryController.show()
+        // Wire now-playing updates to menu item
+        appState.onNowPlayingChanged = { [weak self] title in
+            self?.nowPlayingItem?.title = title ?? "No wallpaper active"
+        }
+
+        appState.engine.start()
+        appState.restoreLastWallpaper()
+
+        Task {
+            await appState.restoreSession()
+        }
+
+        galleryController.show(appState: appState)
     }
 
     private func buildMenu() -> NSMenu {
@@ -42,6 +54,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Now playing
         let nowPlaying = NSMenuItem(title: "No wallpaper active", action: nil, keyEquivalent: "")
         nowPlaying.isEnabled = false
+        nowPlayingItem = nowPlaying
         menu.addItem(nowPlaying)
 
         menu.addItem(NSMenuItem.separator())
@@ -66,14 +79,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func openGallery() {
-        galleryController.show()
+        galleryController.show(appState: appState)
     }
 
     @objc func togglePlayPause() {
         if isPaused {
-            engine.resumeAll()
+            appState.engine.resumeAll()
         } else {
-            engine.pauseAll()
+            appState.engine.pauseAll()
         }
         isPaused.toggle()
 
@@ -85,7 +98,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func skipToNext() {
-        // TODO: Wire to playlist manager for next wallpaper rotation
+        appState.skipToNext()
     }
 
     @objc func checkForUpdates() {
