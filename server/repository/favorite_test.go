@@ -26,7 +26,7 @@ func newTestFavoriteRepo(t *testing.T) (*FavoriteRepo, *UserRepo, *WallpaperRepo
 	db.Exec("DELETE FROM favorites")
 	db.Exec("DELETE FROM reports")
 	db.Exec("DELETE FROM wallpapers")
-	db.Exec("DELETE FROM users WHERE email LIKE '%example.com'")
+	db.Exec("DELETE FROM users WHERE email LIKE '%repo.test'")
 
 	return NewFavoriteRepo(db), NewUserRepo(db), NewWallpaperRepo(db), db
 }
@@ -35,7 +35,7 @@ func TestFavoriteToggle_AddAndRemove(t *testing.T) {
 	favs, users, wps, _ := newTestFavoriteRepo(t)
 	ctx := context.Background()
 
-	u, err := users.Create(ctx, "fav-toggle@example.com", "hash", "user")
+	u, err := users.Create(ctx, "fav-toggle@repo.test", "hash", "user")
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestFavoriteListByUser(t *testing.T) {
 	favs, users, wps, _ := newTestFavoriteRepo(t)
 	ctx := context.Background()
 
-	u, _ := users.Create(ctx, "fav-list@example.com", "hash", "user")
+	u, _ := users.Create(ctx, "fav-list@repo.test", "hash", "user")
 	wp1, _ := wps.Create(ctx, CreateParams{Title: "Fav 1", UploaderID: u.ID, StorageKey: "k1"})
 	wp2, _ := wps.Create(ctx, CreateParams{Title: "Fav 2", UploaderID: u.ID, StorageKey: "k2"})
 
@@ -90,7 +90,7 @@ func TestFavoriteListByUser_Empty(t *testing.T) {
 	favs, users, _, _ := newTestFavoriteRepo(t)
 	ctx := context.Background()
 
-	u, _ := users.Create(ctx, "fav-empty@example.com", "hash", "user")
+	u, _ := users.Create(ctx, "fav-empty@repo.test", "hash", "user")
 
 	wallpapers, total, err := favs.ListByUser(ctx, u.ID, 10, 0)
 	if err != nil {

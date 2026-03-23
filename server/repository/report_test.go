@@ -26,7 +26,7 @@ func newTestReportRepo(t *testing.T) (*ReportRepo, *UserRepo, *WallpaperRepo, *s
 	db.Exec("DELETE FROM favorites")
 	db.Exec("DELETE FROM reports")
 	db.Exec("DELETE FROM wallpapers")
-	db.Exec("DELETE FROM users WHERE email LIKE '%example.com'")
+	db.Exec("DELETE FROM users WHERE email LIKE '%repo.test'")
 
 	return NewReportRepo(db), NewUserRepo(db), NewWallpaperRepo(db), db
 }
@@ -35,7 +35,7 @@ func TestReportCreate(t *testing.T) {
 	reports, users, wps, _ := newTestReportRepo(t)
 	ctx := context.Background()
 
-	u, _ := users.Create(ctx, "report-create@example.com", "hash", "user")
+	u, _ := users.Create(ctx, "report-create@repo.test", "hash", "user")
 	wp, _ := wps.Create(ctx, CreateParams{Title: "Report Test", UploaderID: u.ID, StorageKey: "k1"})
 
 	report, err := reports.Create(ctx, wp.ID, u.ID, "inappropriate")
@@ -57,7 +57,7 @@ func TestReportListPending(t *testing.T) {
 	reports, users, wps, _ := newTestReportRepo(t)
 	ctx := context.Background()
 
-	u, _ := users.Create(ctx, "report-list@example.com", "hash", "user")
+	u, _ := users.Create(ctx, "report-list@repo.test", "hash", "user")
 	wp, _ := wps.Create(ctx, CreateParams{Title: "Report List", UploaderID: u.ID, StorageKey: "k1"})
 
 	reports.Create(ctx, wp.ID, u.ID, "spam")
@@ -79,7 +79,7 @@ func TestReportDismiss(t *testing.T) {
 	reports, users, wps, _ := newTestReportRepo(t)
 	ctx := context.Background()
 
-	u, _ := users.Create(ctx, "report-dismiss@example.com", "hash", "user")
+	u, _ := users.Create(ctx, "report-dismiss@repo.test", "hash", "user")
 	wp, _ := wps.Create(ctx, CreateParams{Title: "Report Dismiss", UploaderID: u.ID, StorageKey: "k1"})
 
 	report, _ := reports.Create(ctx, wp.ID, u.ID, "spam")

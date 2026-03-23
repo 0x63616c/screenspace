@@ -26,7 +26,7 @@ func newTestUserRepo(t *testing.T) *UserRepo {
 	db.Exec("DELETE FROM favorites")
 	db.Exec("DELETE FROM reports")
 	db.Exec("DELETE FROM wallpapers")
-	db.Exec("DELETE FROM users WHERE email LIKE '%example.com'")
+	db.Exec("DELETE FROM users WHERE email LIKE '%repo.test'")
 
 	return NewUserRepo(db)
 }
@@ -35,18 +35,18 @@ func TestUserRepo_CreateAndGetByEmail(t *testing.T) {
 	repo := newTestUserRepo(t)
 	ctx := context.Background()
 
-	u, err := repo.Create(ctx, "create-test@example.com", "hashedpw", "user")
+	u, err := repo.Create(ctx, "create-test@repo.test", "hashedpw", "user")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	if u.Email != "create-test@example.com" {
-		t.Fatalf("expected email create-test@example.com, got %s", u.Email)
+	if u.Email != "create-test@repo.test" {
+		t.Fatalf("expected email create-test@repo.test, got %s", u.Email)
 	}
 	if u.Role != "user" {
 		t.Fatalf("expected role user, got %s", u.Role)
 	}
 
-	got, err := repo.GetByEmail(ctx, "create-test@example.com")
+	got, err := repo.GetByEmail(ctx, "create-test@repo.test")
 	if err != nil {
 		t.Fatalf("get by email: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestUserRepo_GetByID(t *testing.T) {
 	repo := newTestUserRepo(t)
 	ctx := context.Background()
 
-	u, err := repo.Create(ctx, "getbyid-test@example.com", "hashedpw", "user")
+	u, err := repo.Create(ctx, "getbyid-test@repo.test", "hashedpw", "user")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -77,12 +77,12 @@ func TestUserRepo_DuplicateEmail(t *testing.T) {
 	repo := newTestUserRepo(t)
 	ctx := context.Background()
 
-	_, err := repo.Create(ctx, "dup-test@example.com", "hashedpw", "user")
+	_, err := repo.Create(ctx, "dup-test@repo.test", "hashedpw", "user")
 	if err != nil {
 		t.Fatalf("first create: %v", err)
 	}
 
-	_, err = repo.Create(ctx, "dup-test@example.com", "hashedpw2", "user")
+	_, err = repo.Create(ctx, "dup-test@repo.test", "hashedpw2", "user")
 	if err == nil {
 		t.Fatal("expected error for duplicate email, got nil")
 	}
@@ -92,7 +92,7 @@ func TestUserRepo_SetBanned(t *testing.T) {
 	repo := newTestUserRepo(t)
 	ctx := context.Background()
 
-	u, err := repo.Create(ctx, "ban-test@example.com", "hashedpw", "user")
+	u, err := repo.Create(ctx, "ban-test@repo.test", "hashedpw", "user")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestUserRepo_SetRole(t *testing.T) {
 	repo := newTestUserRepo(t)
 	ctx := context.Background()
 
-	u, err := repo.Create(ctx, "role-test@example.com", "hashedpw", "user")
+	u, err := repo.Create(ctx, "role-test@repo.test", "hashedpw", "user")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestUserRepo_List(t *testing.T) {
 	ctx := context.Background()
 
 	for i := range 3 {
-		email := "list-test-" + string(rune('a'+i)) + "@example.com"
+		email := "list-test-" + string(rune('a'+i)) + "@repo.test"
 		if _, err := repo.Create(ctx, email, "hashedpw", "user"); err != nil {
 			t.Fatalf("create %d: %v", i, err)
 		}

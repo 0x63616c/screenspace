@@ -26,14 +26,14 @@ func newTestWallpaperRepo(t *testing.T) (*WallpaperRepo, *UserRepo) {
 	db.Exec("DELETE FROM favorites")
 	db.Exec("DELETE FROM reports")
 	db.Exec("DELETE FROM wallpapers")
-	db.Exec("DELETE FROM users WHERE email LIKE '%example.com'")
+	db.Exec("DELETE FROM users WHERE email LIKE '%repo.test'")
 
 	return NewWallpaperRepo(db), NewUserRepo(db)
 }
 
 func createTestUser(t *testing.T, users *UserRepo, suffix string) *User {
 	t.Helper()
-	u, err := users.Create(context.Background(), fmt.Sprintf("wp-test-%s@example.com", suffix), "hashedpw", "user")
+	u, err := users.Create(context.Background(), fmt.Sprintf("wp-test-%s@repo.test", suffix), "hashedpw", "user")
 	if err != nil {
 		t.Fatalf("create test user: %v", err)
 	}
