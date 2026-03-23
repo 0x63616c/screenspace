@@ -24,6 +24,12 @@ struct AppConfig: Codable, Equatable {
     var screenAssignments: [String: String]
     var lastPlayedURL: String?
 
+    #if DEBUG
+    static let defaultServerURL = "http://localhost:8080"
+    #else
+    static let defaultServerURL = "https://api.screenspace.app"
+    #endif
+
     static let `default` = AppConfig(
         version: 1,
         launchAtLogin: true,
@@ -32,11 +38,7 @@ struct AppConfig: Codable, Equatable {
         videoQuality: "original",
         videoGravity: .resizeAspectFill,
         cacheSizeLimitMB: 5120,
-        #if DEBUG
-        serverURL: "http://localhost:8080",
-        #else
-        serverURL: "https://api.screenspace.app",
-        #endif
+        serverURL: defaultServerURL,
         screenAssignments: [:],
         lastPlayedURL: nil
     )
