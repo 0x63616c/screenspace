@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -329,19 +328,7 @@ type listWallpapersResponse struct {
 func (h *WallpaperHandler) List(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
-	limit := 20
-	if l := q.Get("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
-			limit = parsed
-		}
-	}
-
-	offset := 0
-	if o := q.Get("offset"); o != "" {
-		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
-			offset = parsed
-		}
-	}
+	limit, offset := parseLimitOffset(q)
 
 	sort := "recent"
 	if s := q.Get("sort"); s == "popular" || s == "recent" {

@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"github.com/0x63616c/screenspace/server/repository"
 )
@@ -57,19 +56,7 @@ func (h *FavoriteHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	q := r.URL.Query()
 
-	limit := 20
-	if l := q.Get("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
-			limit = parsed
-		}
-	}
-
-	offset := 0
-	if o := q.Get("offset"); o != "" {
-		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
-			offset = parsed
-		}
-	}
+	limit, offset := parseLimitOffset(q)
 
 	wallpapers, total, err := h.favorites.ListByUser(r.Context(), claims.UserID, limit, offset)
 	if err != nil {
