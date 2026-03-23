@@ -54,7 +54,7 @@ Renders video behind desktop icons on each display.
 **WallpaperWindow** - Subclass of `NSWindow`
 - Borderless: `NSWindow.StyleMask.borderless`
 - Non-activating, non-interactive (ignores all events)
-- Window level: `NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)) + 1)`
+- Window level: `NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)))` (exact desktop level, needs empirical tuning to confirm it sits above the static wallpaper but below Finder's desktop icon window)
 - Spans the full frame of its assigned `NSScreen`
 - Content view is layer-backed (`wantsLayer = true`) with `AVPlayerLayer` as the backing layer
 - Listens for `NSApplication.didChangeScreenParametersNotification` to handle display changes
@@ -68,7 +68,7 @@ Renders video behind desktop icons on each display.
   - Low power mode: `ProcessInfo.processInfo.isLowPowerModeEnabled` + `NSProcessInfoPowerStateDidChange` notification
   - Screen locked: `DistributedNotificationCenter` observing `"com.apple.screenIsLocked"` / `"com.apple.screenIsUnlocked"`
   - Sleep/wake: `NSWorkspace.willSleepNotification` / `NSWorkspace.didWakeNotification`
-  - Fullscreen app active: `NSWorkspace.activeSpaceDidChangeNotification`
+  - Fullscreen app covering display: check `NSWindow.occlusionState` on each `WallpaperWindow`. When `.visible` is not present, the window is fully occluded (e.g. by a fullscreen app). This is per-window, so multi-monitor is handled correctly.
   - Screensaver running: detect and defer to screensaver
 - Auto-resumes when conditions clear. Resumes from current position, not restart.
 
@@ -175,7 +175,7 @@ All state stored locally as JSON.
 - `GlassEffectContainer` to group glass elements (glass cannot sample other glass)
 - Liquid Glass with lensing effect
 
-**macOS 15-25 (fallback):**
+**macOS 15 (Sequoia, pre-Tahoe fallback):**
 - SwiftUI `.ultraThinMaterial` / `.thinMaterial` backgrounds
 - Uses `NSVisualEffectView` under the hood
 - Still glassy, just not the new Liquid Glass
@@ -190,12 +190,14 @@ Go API server with S3-compatible storage.
 
 ```
 POST   /api/v1/wallpapers              # Upload (authenticated)
-GET    /api/v1/wallpapers              # Browse (public, paginated)
+GET    /api/v1/wallpapers              # Browse (public, paginated, ?q=, ?category=, ?sort=)
 GET    /api/v1/wallpapers/:id          # Metadata + pre-signed download URL
 DELETE /api/v1/wallpapers/:id          # Remove (admin/uploader only)
 GET    /api/v1/wallpapers/popular      # Sorted by download count
 GET    /api/v1/wallpapers/recent       # Sorted by upload date
 POST   /api/v1/wallpapers/:id/report   # Flag content
+POST   /api/v1/wallpapers/:id/favorite # Toggle favorite (authenticated)
+GET    /api/v1/me/favorites            # List user's favorites
 
 POST   /api/v1/auth/register           # Create account (email + password)
 POST   /api/v1/auth/login              # Get JWT token
@@ -208,12 +210,16 @@ POST   /api/v1/admin/queue/:id/reject
 
 ### Upload Flow
 
-1. User uploads MP4/MOV from the macOS app (or web form later)
-2. Server validates: format (H.264/H.265), max 200MB, max 60s duration, min 1080p resolution
-3. Server generates thumbnail and 10s low-res preview clip via `ffmpeg`
-4. Wallpaper enters `pending` state in the database
-5. Admin reviews in moderation queue, approves or rejects
-6. On approval, wallpaper becomes visible in browse/search
+Two-phase upload to keep large files (up to 200MB) off the Go server:
+
+1. Client calls `POST /api/v1/wallpapers` with metadata (title, category, tags). Server creates a `pending` record and returns a pre-signed S3 upload URL.
+2. Client uploads MP4/MOV directly to S3 via the pre-signed URL.
+3. Client calls `POST /api/v1/wallpapers/:id/finalize` to signal upload complete.
+4. Server validates the uploaded file: format (H.264/H.265), max 200MB, max 60s duration, min 1080p resolution.
+5. Server generates thumbnail and 10s low-res preview clip via `ffmpeg`.
+6. Wallpaper enters `pending_review` state in the database.
+7. Admin reviews in moderation queue, approves or rejects.
+8. On approval, wallpaper becomes visible in browse/search.
 
 ### Storage Layout
 
@@ -236,6 +242,8 @@ wallpapers (
   duration      FLOAT NOT NULL,                   -- seconds
   file_size     BIGINT NOT NULL,                  -- bytes
   format        TEXT NOT NULL,                     -- h264/h265
+  category      TEXT,                           -- e.g. "nature", "abstract", "urban"
+  tags          TEXT[] DEFAULT '{}',
   download_count BIGINT DEFAULT 0,
   storage_key   TEXT NOT NULL,
   thumbnail_key TEXT NOT NULL,
@@ -250,6 +258,13 @@ users (
   password_hash TEXT NOT NULL,
   role          TEXT NOT NULL DEFAULT 'user',      -- user/admin
   created_at    TIMESTAMPTZ DEFAULT now()
+)
+
+favorites (
+  user_id       UUID REFERENCES users(id),
+  wallpaper_id  UUID REFERENCES wallpapers(id),
+  created_at    TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (user_id, wallpaper_id)
 )
 
 reports (
@@ -272,6 +287,8 @@ type Store interface {
     List(ctx context.Context, prefix string) ([]string, error)
     Delete(ctx context.Context, key string) error
     PreSignedURL(ctx context.Context, key string, expiry time.Duration) (string, error)
+    PreSignedUploadURL(ctx context.Context, key string, expiry time.Duration) (string, error)
+    Stat(ctx context.Context, key string) (ObjectInfo, error)
 }
 ```
 
@@ -288,6 +305,14 @@ Implemented for S3-compatible storage. Swapping providers is a config change.
 - App downloads directly from storage via pre-signed S3 URLs, not through the API server
 - Reduces server load and leverages CDN/storage provider bandwidth
 
+### Error Handling & Offline Behavior
+
+- Local library always works regardless of server connectivity
+- Community gallery shows cached content when offline, with a subtle "offline" indicator
+- Failed downloads: retry up to 3 times with exponential backoff, then surface error to user
+- Interrupted downloads: use `URLSession` background download tasks which support automatic resume
+- Expired pre-signed URLs: re-request from API before retrying download
+
 ---
 
 ## 5. Lock Screen
@@ -297,9 +322,9 @@ Implemented for S3-compatible storage. Swapping providers is a config change.
 No public API for lock screen wallpapers. Workaround:
 
 1. Extract a high-quality still frame using `AVAssetImageGenerator.image(at:)` at a user-selectable timestamp (default 2s)
-2. Write image to `/Library/Caches/Desktop Pictures/<UUID>/lockscreen.png`
-3. UUID discovered by scanning that directory for the current user's folder
-4. Requires elevated permissions, prompt user once with explanation
+2. Write image to `/Library/Caches/Desktop Pictures/<GeneratedUID>/lockscreen.png`
+3. The `GeneratedUID` is the user's directory services UUID, retrieved via `dscl . -read /Users/$USER GeneratedUID`
+4. This directory is root-owned. Use `AuthorizationServices` to prompt for admin credentials and run a privileged helper to write the file. Prompt once and explain why.
 
 **Caveats surfaced to user:**
 - Lock screen is a static frame, not video (macOS limitation)
@@ -344,7 +369,9 @@ Proper Apple-supported API via the `ScreenSaver` framework.
 ### Communication
 
 - No IPC needed
+- The screensaver is strictly read-only. It never writes to config or playlist files.
 - Screensaver reads config JSON at launch, main app writes it
+- If the user changes wallpaper while the screensaver is active, the change takes effect on next screensaver activation
 - Video files live in the shared cache directory
 
 ---
