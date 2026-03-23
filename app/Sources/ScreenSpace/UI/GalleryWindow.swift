@@ -132,6 +132,13 @@ struct GalleryContentView: View {
         }
         .listStyle(.sidebar)
         .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
+        .safeAreaInset(edge: .bottom) {
+            Text("ScreenSpace")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .padding(.bottom, 8)
+                .frame(maxWidth: .infinity)
+        }
     }
 
     @ViewBuilder

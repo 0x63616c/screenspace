@@ -56,7 +56,7 @@ struct SettingsView: View {
                     saveConfig()
                 }
 
-            Text("Version 0.1.0")
+            Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0-dev")")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
