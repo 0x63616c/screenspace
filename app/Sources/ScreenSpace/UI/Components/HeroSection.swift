@@ -37,6 +37,7 @@ struct HeroSection: View {
                 Text(wallpaper?.title ?? "No wallpapers yet")
                     .font(.title.bold())
                     .foregroundStyle(.white)
+                    .lineLimit(2)
 
                 if let wp = wallpaper {
                     HStack(spacing: 12) {

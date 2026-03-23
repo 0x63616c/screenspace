@@ -76,6 +76,14 @@ struct LibraryView: View {
             .controlSize(.small)
         }
         .frame(width: 200)
+        .contextMenu {
+            Button("Set as Wallpaper") { setWallpaper(url: url) }
+            Divider()
+            Button("Remove from Library", role: .destructive) {
+                try? FileManager.default.removeItem(at: url)
+                localVideos.removeAll { $0 == url }
+            }
+        }
     }
 
     private func loadLibrary() {
