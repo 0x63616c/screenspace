@@ -24,6 +24,7 @@ final class CacheManager: Sendable {
             try FileManager.default.removeItem(at: destURL)
         }
         try FileManager.default.copyItem(at: sourceURL, to: destURL)
+        evictIfNeeded(limitMB: ConfigManager.shared.config.cacheSizeLimitMB)
         return destURL
     }
 
@@ -35,6 +36,30 @@ final class CacheManager: Sendable {
             try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize
         }.reduce(0, +)
         return totalBytes / (1024 * 1024)
+    }
+
+    func evictIfNeeded(limitMB: Int) {
+        let currentMB = currentCacheSizeMB()
+        guard currentMB > limitMB else { return }
+
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: cacheDir,
+            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey]
+        ) else { return }
+
+        let sorted = files.sorted { a, b in
+            let dateA = (try? a.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let dateB = (try? b.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            return dateA < dateB
+        }
+
+        var remaining = currentMB
+        for file in sorted {
+            guard remaining > limitMB else { break }
+            let fileSize = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            try? FileManager.default.removeItem(at: file)
+            remaining -= fileSize / (1024 * 1024)
+        }
     }
 
     func clearCache() throws {
