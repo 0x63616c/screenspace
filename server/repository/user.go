@@ -112,3 +112,52 @@ func (r *UserRepo) Count(ctx context.Context) (int, error) {
 	}
 	return count, nil
 }
+
+// ListWithSearch returns users filtered by optional email search, with total count.
+func (r *UserRepo) ListWithSearch(ctx context.Context, query string, limit, offset int) ([]*User, int, error) {
+	var total int
+	if query != "" {
+		err := r.db.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM users WHERE email ILIKE $1`, "%"+query+"%",
+		).Scan(&total)
+		if err != nil {
+			return nil, 0, fmt.Errorf("count users: %w", err)
+		}
+	} else {
+		var err error
+		total, err = r.Count(ctx)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	var rows *sql.Rows
+	var err error
+	if query != "" {
+		rows, err = r.db.QueryContext(ctx,
+			`SELECT id, email, password_hash, role, banned, created_at FROM users
+			 WHERE email ILIKE $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+			"%"+query+"%", limit, offset,
+		)
+	} else {
+		rows, err = r.db.QueryContext(ctx,
+			`SELECT id, email, password_hash, role, banned, created_at FROM users
+			 ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+			limit, offset,
+		)
+	}
+	if err != nil {
+		return nil, 0, fmt.Errorf("list users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*User
+	for rows.Next() {
+		u := &User{}
+		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.Banned, &u.CreatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scan user: %w", err)
+		}
+		users = append(users, u)
+	}
+	return users, total, rows.Err()
+}
