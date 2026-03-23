@@ -1,123 +1,22 @@
 package handler
 
 import (
-	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
-	"net/http/httptest"
-	"os"
 	"testing"
-
-	_ "github.com/lib/pq"
-
-	"github.com/0x63616c/screenspace/server/middleware"
-	"github.com/0x63616c/screenspace/server/repository"
-	"github.com/0x63616c/screenspace/server/service"
 )
 
 type testAdminEnv struct {
-	handler    *AdminHandler
-	users      *repository.UserRepo
-	wallpapers *repository.WallpaperRepo
-	reports    *repository.ReportRepo
-	favorites  *repository.FavoriteRepo
-	auth       *service.AuthService
-	db         *sql.DB
+	*testDB
+	handler *AdminHandler
 }
 
 func newTestAdminHandler(t *testing.T) *testAdminEnv {
 	t.Helper()
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgres://screenspace:devpassword@localhost:5432/screenspace?sslmode=disable"
-	}
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		t.Skipf("skipping, no database: %v", err)
-	}
-	if err := db.Ping(); err != nil {
-		t.Skipf("skipping, database unreachable: %v", err)
-	}
-
-	db.Exec("DELETE FROM favorites")
-	db.Exec("DELETE FROM reports")
-	db.Exec("DELETE FROM wallpapers")
-	db.Exec("DELETE FROM users WHERE email LIKE '%example.com'")
-
-	users := repository.NewUserRepo(db)
-	wallpapers := repository.NewWallpaperRepo(db)
-	reports := repository.NewReportRepo(db)
-	favorites := repository.NewFavoriteRepo(db)
-	auth := service.NewAuthService("test-secret")
-	h := NewAdminHandler(wallpapers, users, reports)
-
-	return &testAdminEnv{
-		handler:    h,
-		users:      users,
-		wallpapers: wallpapers,
-		reports:    reports,
-		favorites:  favorites,
-		auth:       auth,
-		db:         db,
-	}
-}
-
-func (env *testAdminEnv) createUser(t *testing.T, email, role string) *repository.User {
-	t.Helper()
-	u, err := env.users.Create(context.Background(), email, "hashedpw", role)
-	if err != nil {
-		t.Fatalf("create test user: %v", err)
-	}
-	return u
-}
-
-func (env *testAdminEnv) createWallpaperWithStatus(t *testing.T, title, uploaderID, status string) *repository.Wallpaper {
-	t.Helper()
-	ctx := context.Background()
-	wp, err := env.wallpapers.Create(ctx, repository.CreateParams{
-		Title:      title,
-		UploaderID: uploaderID,
-		StorageKey: fmt.Sprintf("wallpapers/test/%s.mp4", title),
-	})
-	if err != nil {
-		t.Fatalf("create wallpaper: %v", err)
-	}
-	if err := env.wallpapers.UpdateStatus(ctx, wp.ID, status); err != nil {
-		t.Fatalf("update status: %v", err)
-	}
-	wp, _ = env.wallpapers.GetByID(ctx, wp.ID)
-	return wp
-}
-
-func (env *testAdminEnv) authRequest(t *testing.T, method, url, body, userID, role string) (*httptest.ResponseRecorder, *http.Request) {
-	t.Helper()
-	var bodyReader io.Reader
-	if body != "" {
-		bodyReader = bytes.NewBufferString(body)
-	}
-	req := httptest.NewRequest(method, url, bodyReader)
-
-	token, err := env.auth.GenerateToken(userID, role)
-	if err != nil {
-		t.Fatalf("generate token: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	var captured *http.Request
-	authMiddleware := middleware.Auth(env.auth)
-	handler := authMiddleware(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		captured = r
-	}))
-	handler.ServeHTTP(httptest.NewRecorder(), req)
-	if captured == nil {
-		t.Fatal("auth middleware did not pass request through")
-	}
-
-	return httptest.NewRecorder(), captured
+	tdb := newTestDB(t)
+	h := NewAdminHandler(tdb.Wallpapers, tdb.Users, tdb.Reports)
+	return &testAdminEnv{testDB: tdb, handler: h}
 }
 
 func TestAdminQueue_Success(t *testing.T) {
@@ -172,7 +71,7 @@ func TestAdminApprove_Success(t *testing.T) {
 	}
 
 	// Verify status changed
-	updated, _ := env.wallpapers.GetByID(context.Background(), wp.ID)
+	updated, _ := env.Wallpapers.GetByID(context.Background(), wp.ID)
 	if updated.Status != "approved" {
 		t.Fatalf("expected approved, got %s", updated.Status)
 	}
@@ -194,7 +93,7 @@ func TestAdminReject_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	updated, _ := env.wallpapers.GetByID(context.Background(), wp.ID)
+	updated, _ := env.Wallpapers.GetByID(context.Background(), wp.ID)
 	if updated.Status != "rejected" {
 		t.Fatalf("expected rejected, got %s", updated.Status)
 	}
@@ -238,7 +137,7 @@ func TestAdminEditWallpaper_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	updated, _ := env.wallpapers.GetByID(context.Background(), wp.ID)
+	updated, _ := env.Wallpapers.GetByID(context.Background(), wp.ID)
 	if updated.Title != "Updated Title" {
 		t.Fatalf("expected 'Updated Title', got '%s'", updated.Title)
 	}
@@ -280,7 +179,7 @@ func TestAdminBanUser_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	updated, _ := env.users.GetByID(context.Background(), target.ID)
+	updated, _ := env.Users.GetByID(context.Background(), target.ID)
 	if !updated.Banned {
 		t.Fatal("expected banned=true")
 	}
@@ -292,7 +191,7 @@ func TestAdminUnbanUser_Success(t *testing.T) {
 	target := env.createUser(t, "target-unban@example.com", "user")
 
 	// Ban first
-	env.users.SetBanned(context.Background(), target.ID, true)
+	env.Users.SetBanned(context.Background(), target.ID, true)
 
 	w, r := env.authRequest(t, http.MethodPost, "/admin/users/"+target.ID+"/unban", "", admin.ID, "admin")
 	r.SetPathValue("id", target.ID)
@@ -302,7 +201,7 @@ func TestAdminUnbanUser_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	updated, _ := env.users.GetByID(context.Background(), target.ID)
+	updated, _ := env.Users.GetByID(context.Background(), target.ID)
 	if updated.Banned {
 		t.Fatal("expected banned=false")
 	}
@@ -321,7 +220,7 @@ func TestAdminPromoteUser_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	updated, _ := env.users.GetByID(context.Background(), target.ID)
+	updated, _ := env.Users.GetByID(context.Background(), target.ID)
 	if updated.Role != "admin" {
 		t.Fatalf("expected role 'admin', got '%s'", updated.Role)
 	}
@@ -385,7 +284,7 @@ func TestAdminReject_StoresReason(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	updated, err := env.wallpapers.GetByID(context.Background(), wp.ID)
+	updated, err := env.Wallpapers.GetByID(context.Background(), wp.ID)
 	if err != nil {
 		t.Fatalf("get wallpaper: %v", err)
 	}
@@ -417,7 +316,7 @@ func TestAdminListReports_Success(t *testing.T) {
 	user := env.createUser(t, "reporter-listreports@example.com", "user")
 	wp := env.createWallpaperWithStatus(t, "Reported WP", user.ID, "approved")
 
-	env.reports.Create(context.Background(), wp.ID, user.ID, "spam")
+	env.Reports.Create(context.Background(), wp.ID, user.ID, "spam")
 
 	w, r := env.authRequest(t, http.MethodGet, "/admin/reports", "", admin.ID, "admin")
 	env.handler.ListReports(w, r)
@@ -442,7 +341,7 @@ func TestAdminDismissReport_Success(t *testing.T) {
 	user := env.createUser(t, "reporter-dismiss@example.com", "user")
 	wp := env.createWallpaperWithStatus(t, "Dismiss WP", user.ID, "approved")
 
-	report, _ := env.reports.Create(context.Background(), wp.ID, user.ID, "spam")
+	report, _ := env.Reports.Create(context.Background(), wp.ID, user.ID, "spam")
 
 	w, r := env.authRequest(t, http.MethodPost, "/admin/reports/"+report.ID+"/dismiss", "", admin.ID, "admin")
 	r.SetPathValue("id", report.ID)
@@ -453,7 +352,7 @@ func TestAdminDismissReport_Success(t *testing.T) {
 	}
 
 	// Verify no longer in pending
-	reports, total, _ := env.reports.ListPending(context.Background(), 100, 0)
+	reports, total, _ := env.Reports.ListPending(context.Background(), 100, 0)
 	if total != 0 {
 		t.Fatalf("expected 0 pending, got %d", total)
 	}

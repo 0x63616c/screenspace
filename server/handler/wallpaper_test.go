@@ -3,20 +3,15 @@ package handler
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
-	_ "github.com/lib/pq"
-
-	"github.com/0x63616c/screenspace/server/middleware"
 	"github.com/0x63616c/screenspace/server/repository"
 	"github.com/0x63616c/screenspace/server/service"
 	"github.com/0x63616c/screenspace/server/storage"
@@ -80,88 +75,23 @@ func (m *mockStore) PreSignedUploadURL(_ context.Context, key string, _ time.Dur
 }
 
 type testWallpaperEnv struct {
-	handler    *WallpaperHandler
-	users      *repository.UserRepo
-	wallpapers *repository.WallpaperRepo
-	auth       *service.AuthService
-	store      *mockStore
-	db         *sql.DB
+	*testDB
+	handler *WallpaperHandler
+	store   *mockStore
 }
 
 func newTestWallpaperHandler(t *testing.T) *testWallpaperEnv {
 	t.Helper()
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgres://screenspace:devpassword@localhost:5432/screenspace?sslmode=disable"
-	}
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		t.Skipf("skipping, no database: %v", err)
-	}
-	if err := db.Ping(); err != nil {
-		t.Skipf("skipping, database unreachable: %v", err)
-	}
-
-	db.Exec("DELETE FROM favorites")
-	db.Exec("DELETE FROM reports")
-	db.Exec("DELETE FROM wallpapers")
-	db.Exec("DELETE FROM users WHERE email LIKE '%example.com'")
-
-	users := repository.NewUserRepo(db)
-	wallpapers := repository.NewWallpaperRepo(db)
-	auth := service.NewAuthService("test-secret")
+	tdb := newTestDB(t)
 	store := newMockStore()
 	video := service.NewVideoService()
-
-	h := NewWallpaperHandler(wallpapers, store, video, auth)
+	h := NewWallpaperHandler(tdb.Wallpapers, store, video, tdb.Auth)
 
 	return &testWallpaperEnv{
-		handler:    h,
-		users:      users,
-		wallpapers: wallpapers,
-		auth:       auth,
-		store:      store,
-		db:         db,
+		testDB:  tdb,
+		handler: h,
+		store:   store,
 	}
-}
-
-func (env *testWallpaperEnv) createUser(t *testing.T, email, role string) *repository.User {
-	t.Helper()
-	u, err := env.users.Create(context.Background(), email, "hashedpw", role)
-	if err != nil {
-		t.Fatalf("create test user: %v", err)
-	}
-	return u
-}
-
-// authRequest creates a request with valid auth claims injected via middleware.
-// It runs the request through middleware.Auth to properly set the context.
-func (env *testWallpaperEnv) authRequest(t *testing.T, method, url, body, userID, role string) (*httptest.ResponseRecorder, *http.Request) {
-	t.Helper()
-	var bodyReader io.Reader
-	if body != "" {
-		bodyReader = bytes.NewBufferString(body)
-	}
-	req := httptest.NewRequest(method, url, bodyReader)
-
-	token, err := env.auth.GenerateToken(userID, role)
-	if err != nil {
-		t.Fatalf("generate token: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	// Run through middleware.Auth to inject claims into context properly
-	var captured *http.Request
-	authMiddleware := middleware.Auth(env.auth)
-	handler := authMiddleware(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		captured = r
-	}))
-	handler.ServeHTTP(httptest.NewRecorder(), req)
-	if captured == nil {
-		t.Fatal("auth middleware did not pass request through")
-	}
-
-	return httptest.NewRecorder(), captured
 }
 
 func TestCreateWallpaper_Success(t *testing.T) {
@@ -275,7 +205,7 @@ func TestCreateWallpaper_CategoryNormalized(t *testing.T) {
 	var resp createWallpaperResponse
 	json.NewDecoder(w.Body).Decode(&resp)
 
-	wp, err := env.wallpapers.GetByID(context.Background(), resp.ID)
+	wp, err := env.Wallpapers.GetByID(context.Background(), resp.ID)
 	if err != nil {
 		t.Fatalf("get wallpaper: %v", err)
 	}
@@ -349,31 +279,6 @@ func TestListWallpapers_Empty(t *testing.T) {
 	}
 }
 
-func (env *testWallpaperEnv) createApprovedWallpaper(t *testing.T, title, category string, uploaderID string) *repository.Wallpaper {
-	t.Helper()
-	ctx := context.Background()
-	wp, err := env.wallpapers.Create(ctx, repository.CreateParams{
-		Title:      title,
-		UploaderID: uploaderID,
-		StorageKey: fmt.Sprintf("wallpapers/test/%s.mp4", title),
-	})
-	if err != nil {
-		t.Fatalf("create wallpaper: %v", err)
-	}
-	if category != "" {
-		env.wallpapers.UpdateMetadata(ctx, wp.ID, title, category, []string{})
-	}
-	if err := env.wallpapers.UpdateStatus(ctx, wp.ID, "approved"); err != nil {
-		t.Fatalf("update status: %v", err)
-	}
-	// Re-fetch to get updated fields
-	wp, err = env.wallpapers.GetByID(ctx, wp.ID)
-	if err != nil {
-		t.Fatalf("get wallpaper: %v", err)
-	}
-	return wp
-}
-
 func TestListWallpapers_Paginated(t *testing.T) {
 	env := newTestWallpaperHandler(t)
 	u := env.createUser(t, "list-page@example.com", "user")
@@ -422,7 +327,7 @@ func TestListWallpapers_SortByPopular(t *testing.T) {
 	pop := env.createApprovedWallpaper(t, "Popular", "", u.ID)
 
 	for range 10 {
-		env.wallpapers.IncrementDownloadCount(context.Background(), pop.ID)
+		env.Wallpapers.IncrementDownloadCount(context.Background(), pop.ID)
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/wallpapers?sort=popular", nil)
@@ -445,7 +350,7 @@ func TestListWallpapers_OnlyApproved(t *testing.T) {
 
 	// Create one approved, one pending
 	env.createApprovedWallpaper(t, "Approved WP", "", u.ID)
-	env.wallpapers.Create(context.Background(), repository.CreateParams{
+	env.Wallpapers.Create(context.Background(), repository.CreateParams{
 		Title:      "Pending WP",
 		UploaderID: u.ID,
 		StorageKey: "k-pending",
@@ -505,7 +410,7 @@ func TestGetWallpaper_DoesNotIncrementDownloadCount(t *testing.T) {
 	}
 
 	// Verify download count is still 0
-	updated, err := env.wallpapers.GetByID(context.Background(), wp.ID)
+	updated, err := env.Wallpapers.GetByID(context.Background(), wp.ID)
 	if err != nil {
 		t.Fatalf("get wallpaper: %v", err)
 	}
@@ -535,7 +440,7 @@ func TestDownloadWallpaper_IncrementsCount(t *testing.T) {
 	}
 
 	// Verify download count incremented
-	updated, err := env.wallpapers.GetByID(context.Background(), wp.ID)
+	updated, err := env.Wallpapers.GetByID(context.Background(), wp.ID)
 	if err != nil {
 		t.Fatalf("get wallpaper: %v", err)
 	}
@@ -588,7 +493,7 @@ func TestDeleteWallpaper_AsOwner(t *testing.T) {
 	}
 
 	// Verify deleted
-	_, err := env.wallpapers.GetByID(context.Background(), wp.ID)
+	_, err := env.Wallpapers.GetByID(context.Background(), wp.ID)
 	if err == nil {
 		t.Fatal("expected error after delete")
 	}
@@ -659,7 +564,7 @@ func TestFinalize_NotOwner(t *testing.T) {
 	owner := env.createUser(t, "finalize-owner@example.com", "user")
 	other := env.createUser(t, "finalize-other@example.com", "user")
 
-	wp, err := env.wallpapers.Create(context.Background(), repository.CreateParams{
+	wp, err := env.Wallpapers.Create(context.Background(), repository.CreateParams{
 		Title:      "Finalize Test",
 		UploaderID: owner.ID,
 		StorageKey: "wallpapers/test/original.mp4",
