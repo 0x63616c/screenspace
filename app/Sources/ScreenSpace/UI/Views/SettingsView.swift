@@ -2,9 +2,11 @@ import SwiftUI
 import ServiceManagement
 
 struct SettingsView: View {
+    @Environment(AppState.self) var appState
     @State private var config = ConfigManager.shared.config
     @State private var cacheSize = CacheManager.shared.currentCacheSizeMB()
     @State private var serverURL: String = ConfigManager.shared.config.serverURL
+    @State private var showLogin = false
 
     var body: some View {
         TabView {
@@ -113,17 +115,24 @@ struct SettingsView: View {
 
     private var accountTab: some View {
         Form {
-            if KeychainHelper.loadToken() != nil {
-                Text("Logged in")
-                Button("Logout") {
-                    KeychainHelper.deleteToken()
+            if let user = appState.currentUser {
+                LabeledContent("Email", value: user.email)
+                LabeledContent("Role", value: user.role.capitalized)
+                Button("Log Out") {
+                    appState.logout()
                 }
+                .buttonStyle(.bordered)
             } else {
-                Text("Not logged in")
+                Text("Log in to upload and favorite wallpapers.")
                     .foregroundStyle(.secondary)
-                Text("Login from the gallery to upload and favorite wallpapers.")
-                    .font(.caption)
+                Button("Log In") {
+                    showLogin = true
+                }
+                .buttonStyle(.borderedProminent)
             }
+        }
+        .sheet(isPresented: $showLogin) {
+            LoginView()
         }
     }
 
