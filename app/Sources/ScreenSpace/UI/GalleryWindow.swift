@@ -37,10 +37,12 @@ enum GalleryTab: String, CaseIterable {
     case home = "Home"
     case explore = "Explore"
     case library = "Library"
+    case admin = "Admin"
 }
 
 struct GalleryContentView: View {
     @State private var selectedTab: GalleryTab = .home
+    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -57,14 +59,14 @@ struct GalleryContentView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 250)
+                .frame(width: 320)
 
                 Spacer()
 
                 Button("Upload") { }
                     .buttonStyle(.bordered)
 
-                Button(action: {}) {
+                Button(action: { showSettings = true }) {
                     Image(systemName: "gearshape")
                 }
             }
@@ -79,8 +81,13 @@ struct GalleryContentView: View {
                 ExploreView()
             case .library:
                 LibraryView()
+            case .admin:
+                AdminView()
             }
         }
         .frame(minWidth: 800, minHeight: 600)
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+        }
     }
 }
