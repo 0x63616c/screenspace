@@ -12,8 +12,10 @@ struct ScreenSpaceApp: App {
     }
 }
 
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
+    private let galleryController = GalleryWindowController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -43,9 +45,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             )
         )
         statusItem?.menu = menu
+
+        galleryController.show()
     }
 
     @objc func openGallery() {
-        NSApp.activate(ignoringOtherApps: true)
+        galleryController.show()
     }
 }
