@@ -161,12 +161,18 @@ All state stored locally as JSON.
 
 **Content shelves:**
 - Horizontal scrollable rows: "Popular", "Recently Added", "Your Downloads", category rows
-- Each wallpaper card shows a thumbnail
+- Each wallpaper card shows: thumbnail, title, resolution badge (corner overlay), duration
+- Resolution badge logic: 3840x2160+ = "4K", 2560x1440 = "2K", 1920x1080 = "1080p"
 - On hover (`.onHover` modifier): card scales up slightly, 10s low-res preview video autoplays via `AVPlayer`
 
 **Detail view:**
 - Full video playback preview
-- Glass overlay for metadata, download button, "Set as Wallpaper" button
+- Glass overlay showing: title, category, tags, resolution (e.g. "3840x2160"), file size (e.g. "85MB"), duration (e.g. "32s"), uploader name, download count
+- "Set as Wallpaper" / "Download" / favorite buttons
+
+**Video scaling:**
+- `AVPlayerLayer.videoGravity` defaults to `.resizeAspectFill` (fills screen, slight crop if aspect ratio differs)
+- User can toggle to `.resizeAspect` in settings (fit to screen, letterboxed) if they prefer no cropping
 
 ### Glass/Native Feel
 
