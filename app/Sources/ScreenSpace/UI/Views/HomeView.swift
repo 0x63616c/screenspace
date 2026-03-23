@@ -40,7 +40,16 @@ struct HomeView: View {
                             .padding(.horizontal, 20)
                     }
 
-                    HeroSection(wallpaper: featured)
+                    HeroSection(
+                        wallpaper: featured,
+                        onViewWallpaper: {
+                            if let f = featured { fetchAndShow(id: f.id) }
+                        },
+                        onFavorite: {
+                            guard let f = featured, appState.isLoggedIn else { return }
+                            Task { _ = try? await appState.api.toggleFavorite(id: f.id) }
+                        }
+                    )
                         .padding(.horizontal, 20)
 
                     ShelfRow(title: "Popular", wallpapers: popular, onSelectWallpaper: { data in
