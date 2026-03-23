@@ -16,9 +16,11 @@ struct WallpaperCardData: Identifiable {
 
 struct WallpaperCard: View {
     let data: WallpaperCardData
+    var onTap: (() -> Void)? = nil
     @State private var isHovered = false
 
     var body: some View {
+        Button(action: { onTap?() }) {
         VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .topTrailing) {
                 RoundedRectangle(cornerRadius: 12)
@@ -64,15 +66,21 @@ struct WallpaperCard: View {
                 isHovered = hovering
             }
 
-            Text(data.title)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .lineLimit(1)
+            HStack(spacing: 4) {
+                Text(data.title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
 
-            Text(data.durationLabel)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                Spacer()
+
+                Text(data.durationLabel)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(width: 200)
+        }
+        .buttonStyle(.plain)
     }
 }

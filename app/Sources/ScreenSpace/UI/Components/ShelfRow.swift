@@ -3,6 +3,8 @@ import SwiftUI
 struct ShelfRow: View {
     let title: String
     let wallpapers: [WallpaperCardData]
+    var onSelectWallpaper: ((WallpaperCardData) -> Void)? = nil
+    var onSeeAll: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -13,7 +15,7 @@ struct ShelfRow: View {
 
                 Spacer()
 
-                Button("See All") {}
+                Button("See All") { onSeeAll?() }
                     .buttonStyle(.plain)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -23,7 +25,7 @@ struct ShelfRow: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 14) {
                     ForEach(wallpapers) { wallpaper in
-                        WallpaperCard(data: wallpaper)
+                        WallpaperCard(data: wallpaper, onTap: { onSelectWallpaper?(wallpaper) })
                     }
                 }
                 .padding(.horizontal, 20)
