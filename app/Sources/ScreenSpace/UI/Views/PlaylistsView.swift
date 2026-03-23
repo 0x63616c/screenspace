@@ -8,7 +8,7 @@ struct PlaylistsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
                 Text("Playlists")
                     .font(.title2).fontWeight(.bold)
                     .padding(.horizontal)
@@ -30,7 +30,7 @@ struct PlaylistsView: View {
                 .padding(.horizontal)
 
                 if playlists.isEmpty {
-                    VStack(spacing: 8) {
+                    VStack(spacing: Spacing.sm) {
                         Image(systemName: "music.note.list")
                             .font(.title)
                             .foregroundStyle(.secondary)
@@ -55,7 +55,7 @@ struct PlaylistsView: View {
     }
 
     private func playlistCard(_ playlist: Playlist) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
             HStack {
                 VStack(alignment: .leading) {
                     Text(playlist.name)

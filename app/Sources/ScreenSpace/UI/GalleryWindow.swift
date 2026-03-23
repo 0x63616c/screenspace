@@ -136,7 +136,7 @@ struct GalleryContentView: View {
             Text("ScreenSpace")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
-                .padding(.bottom, 8)
+                .padding(.bottom, Spacing.sm)
                 .frame(maxWidth: .infinity)
         }
     }

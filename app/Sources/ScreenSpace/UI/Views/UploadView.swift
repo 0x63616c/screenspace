@@ -16,7 +16,7 @@ struct UploadView: View {
     @State private var uploadComplete = false
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Spacing.lg) {
             Text("Upload Wallpaper")
                 .font(.title2)
                 .fontWeight(.bold)

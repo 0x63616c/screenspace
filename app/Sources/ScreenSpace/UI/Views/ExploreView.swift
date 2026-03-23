@@ -11,7 +11,7 @@ struct ExploreView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
                 // Search
                 HStack {
                     Image(systemName: "magnifyingglass")
@@ -19,7 +19,7 @@ struct ExploreView: View {
                         .textFieldStyle(.plain)
                         .onSubmit { Task { await search() } }
                 }
-                .padding(8)
+                .padding(Spacing.sm)
                 .background(.quaternary)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .padding(.horizontal)
@@ -29,7 +29,7 @@ struct ExploreView: View {
                     Text("Categories")
                         .font(.title3).fontWeight(.bold)
                         .padding(.horizontal)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 12) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: Spacing.md) {
                         ForEach(categories, id: \.self) { category in
                             Button(action: { Task { await selectCategory(category) } }) {
                                 Text(category.capitalized)
@@ -62,7 +62,7 @@ struct ExploreView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.top, 40)
                 } else if !results.isEmpty {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 200))], spacing: 12) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 200))], spacing: Spacing.md) {
                         ForEach(results) { wp in
                             WallpaperCard(data: wp, onTap: {
                                 Task { selectedWallpaper = try? await appState.api.getWallpaper(id: wp.id) }

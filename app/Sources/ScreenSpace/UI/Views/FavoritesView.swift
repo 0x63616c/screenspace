@@ -8,7 +8,7 @@ struct FavoritesView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
                 Text("Your Favorites")
                     .font(.title2).fontWeight(.bold)
                     .padding(.horizontal)
@@ -16,7 +16,7 @@ struct FavoritesView: View {
                 if isLoading {
                     ProgressView().frame(maxWidth: .infinity)
                 } else if favorites.isEmpty {
-                    VStack(spacing: 8) {
+                    VStack(spacing: Spacing.sm) {
                         Image(systemName: "heart")
                             .font(.title)
                             .foregroundStyle(.secondary)
@@ -29,7 +29,7 @@ struct FavoritesView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 40)
                 } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 200))], spacing: 12) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 200))], spacing: Spacing.md) {
                         ForEach(favorites) { wp in
                             WallpaperCard(data: wp, onTap: {
                                 Task { selectedWallpaper = try? await appState.api.getWallpaper(id: wp.id) }

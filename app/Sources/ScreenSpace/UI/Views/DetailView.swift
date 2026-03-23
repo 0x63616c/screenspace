@@ -117,7 +117,7 @@ struct DetailView: View {
             .padding()
         }
         .sheet(isPresented: $showReportSheet) {
-            VStack(spacing: 16) {
+            VStack(spacing: Spacing.lg) {
                 Text("Report Wallpaper")
                     .font(.headline)
                 TextField("Reason for reporting", text: $reportReason)

@@ -9,7 +9,7 @@ struct LibraryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
                 Text("Your Library")
                     .font(.title2)
                     .fontWeight(.bold)
@@ -19,7 +19,7 @@ struct LibraryView: View {
                     dropZone
                 } else {
                     dropZone
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 200))], spacing: 12) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 200))], spacing: Spacing.md) {
                         ForEach(localVideos, id: \.absoluteString) { url in
                             localVideoCard(url: url)
                         }
@@ -43,7 +43,7 @@ struct LibraryView: View {
     }
 
     private var dropZone: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.sm) {
             Image(systemName: "arrow.down.doc")
                 .font(.title)
             Text("Drop MP4 or MOV files here")

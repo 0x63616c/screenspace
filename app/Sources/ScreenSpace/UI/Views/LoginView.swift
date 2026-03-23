@@ -10,7 +10,7 @@ struct LoginView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Spacing.lg) {
             Text(isRegistering ? "Create Account" : "Log In")
                 .font(.title2).fontWeight(.bold)
 
