@@ -39,6 +39,7 @@ enum GallerySection: String, CaseIterable, Identifiable {
     case home = "Home"
     case explore = "Explore"
     case library = "Library"
+    case favorites = "Favorites"
     case admin = "Admin"
 
     var id: String { rawValue }
@@ -48,6 +49,7 @@ enum GallerySection: String, CaseIterable, Identifiable {
         case .home: return "house"
         case .explore: return "safari"
         case .library: return "square.stack"
+        case .favorites: return "heart"
         case .admin: return "shield"
         }
     }
@@ -109,6 +111,10 @@ struct GalleryContentView: View {
             Section("Your Stuff") {
                 Label("Library", systemImage: "square.stack")
                     .tag(GallerySection.library)
+                if appState.isLoggedIn {
+                    Label("Favorites", systemImage: "heart")
+                        .tag(GallerySection.favorites)
+                }
             }
 
             if appState.isAdmin {
@@ -132,6 +138,8 @@ struct GalleryContentView: View {
                 ExploreView()
             case .library:
                 LibraryView()
+            case .favorites:
+                FavoritesView()
             case .admin:
                 AdminView()
             case .none:
