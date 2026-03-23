@@ -1,31 +1,39 @@
-import Foundation
+import AVFoundation
 
-/// Global app configuration constants
-enum AppConfig {
-    static let appName = "ScreenSpace"
-    static let bundleIdentifier = "com.screenspace.app"
+enum VideoGravityOption: String, Codable {
+    case resizeAspectFill
+    case resizeAspect
 
-    /// Minimum macOS version supported
-    static let minimumMacOSVersion = "15.0"
-
-    /// API base URL (will be configurable for self-hosting)
-    static let defaultAPIBaseURL = URL(string: "https://api.screenspace.live")!
-
-    /// Local storage directory for downloaded wallpapers
-    static var wallpaperCacheDirectory: URL {
-        let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first!
-        return appSupport.appendingPathComponent(appName).appendingPathComponent("Wallpapers")
+    var avLayerGravity: AVLayerVideoGravity {
+        switch self {
+        case .resizeAspectFill: return .resizeAspectFill
+        case .resizeAspect: return .resizeAspect
+        }
     }
+}
 
-    /// Configuration file location
-    static var configFileURL: URL {
-        let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first!
-        return appSupport.appendingPathComponent(appName).appendingPathComponent("config.json")
-    }
+struct AppConfig: Codable, Equatable {
+    var version: Int
+    var launchAtLogin: Bool
+    var pauseOnBattery: Bool
+    var pauseOnFullscreen: Bool
+    var videoQuality: String
+    var videoGravity: VideoGravityOption
+    var cacheSizeLimitMB: Int
+    var serverURL: String
+    var screenAssignments: [String: String]
+    var lastPlayedURL: String?
+
+    static let `default` = AppConfig(
+        version: 1,
+        launchAtLogin: true,
+        pauseOnBattery: true,
+        pauseOnFullscreen: true,
+        videoQuality: "original",
+        videoGravity: .resizeAspectFill,
+        cacheSizeLimitMB: 5120,
+        serverURL: "https://api.screenspace.app",
+        screenAssignments: [:],
+        lastPlayedURL: nil
+    )
 }

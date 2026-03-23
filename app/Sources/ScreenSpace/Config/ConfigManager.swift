@@ -1,65 +1,37 @@
 import Foundation
 
-/// Manages persistent user configuration
-@MainActor
-final class ConfigManager {
+final class ConfigManager: @unchecked Sendable {
     static let shared = ConfigManager()
 
-    private var config: UserConfig
+    private let configURL: URL
+    private(set) var config: AppConfig
 
-    private init() {
-        config = Self.loadConfig() ?? UserConfig()
+    init(directory: URL? = nil) {
+        let dir = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("ScreenSpace")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        self.configURL = dir.appendingPathComponent("config.json")
+        self.config = Self.load(from: configURL) ?? .default
     }
 
-    // MARK: - Public API
-
-    var apiBaseURL: URL {
-        get { config.apiBaseURL ?? AppConfig.defaultAPIBaseURL }
-        set {
-            config.apiBaseURL = newValue
-            save()
+    private static func load(from url: URL) -> AppConfig? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        guard let config = try? JSONDecoder().decode(AppConfig.self, from: data) else {
+            let backup = url.deletingLastPathComponent()
+                .appendingPathComponent("config.json.backup.\(Int(Date().timeIntervalSince1970))")
+            try? FileManager.default.moveItem(at: url, to: backup)
+            return nil
         }
+        return config
     }
 
-    var autoplayEnabled: Bool {
-        get { config.autoplayEnabled }
-        set {
-            config.autoplayEnabled = newValue
-            save()
-        }
+    func save() throws {
+        let data = try JSONEncoder().encode(config)
+        try data.write(to: configURL, options: .atomic)
     }
 
-    var launchAtLogin: Bool {
-        get { config.launchAtLogin }
-        set {
-            config.launchAtLogin = newValue
-            save()
-        }
+    func update(_ transform: (inout AppConfig) -> Void) throws {
+        transform(&config)
+        try save()
     }
-
-    // MARK: - Persistence
-
-    private func save() {
-        do {
-            let dir = AppConfig.configFileURL.deletingLastPathComponent()
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            let data = try JSONEncoder().encode(config)
-            try data.write(to: AppConfig.configFileURL)
-        } catch {
-            print("Failed to save config: \(error)")
-        }
-    }
-
-    private static func loadConfig() -> UserConfig? {
-        guard let data = try? Data(contentsOf: AppConfig.configFileURL) else { return nil }
-        return try? JSONDecoder().decode(UserConfig.self, from: data)
-    }
-}
-
-// MARK: - Config Model
-
-struct UserConfig: Codable {
-    var apiBaseURL: URL?
-    var autoplayEnabled: Bool = true
-    var launchAtLogin: Bool = false
 }
