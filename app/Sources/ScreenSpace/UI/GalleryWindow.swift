@@ -83,11 +83,13 @@ struct GalleryContentView: View {
                 }) {
                     Label("Upload", systemImage: "arrow.up.circle")
                 }
+                .keyboardShortcut("u", modifiers: .command)
             }
             ToolbarItem(placement: .primaryAction) {
                 Button(action: { showSettings = true }) {
                     Label("Settings", systemImage: "gearshape")
                 }
+                .keyboardShortcut(",", modifiers: .command)
             }
         }
         .sheet(isPresented: $showSettings) {
