@@ -113,9 +113,13 @@ func (h *WallpaperHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Update storage key with actual ID
 	actualKey := fmt.Sprintf("wallpapers/%s/original.mp4", wp.ID)
-	h.wallpapers.UpdateAfterFinalize(r.Context(), wp.ID, repository.FinalizeParams{
+	if err := h.wallpapers.UpdateAfterFinalize(r.Context(), wp.ID, repository.FinalizeParams{
 		Status: "pending",
-	})
+	}); err != nil {
+		slog.Error("failed to update storage key after create", "wallpaper_id", wp.ID, "error", err)
+		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		return
+	}
 	wp.StorageKey = actualKey
 
 	// Update metadata if category/tags provided
@@ -124,7 +128,11 @@ func (h *WallpaperHandler) Create(w http.ResponseWriter, r *http.Request) {
 		if tags == nil {
 			tags = []string{}
 		}
-		h.wallpapers.UpdateMetadata(r.Context(), wp.ID, req.Title, req.Category, tags)
+		if err := h.wallpapers.UpdateMetadata(r.Context(), wp.ID, req.Title, req.Category, tags); err != nil {
+			slog.Error("failed to update metadata after create", "wallpaper_id", wp.ID, "error", err)
+			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+			return
+		}
 	}
 
 	uploadURL, err := h.store.PreSignedUploadURL(r.Context(), actualKey, 2*time.Hour)
