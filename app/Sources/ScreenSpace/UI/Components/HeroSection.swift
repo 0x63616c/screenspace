@@ -49,7 +49,7 @@ struct HeroSection: View {
 
                 HStack(spacing: 10) {
                     Button(action: { onViewWallpaper?() }) {
-                        Label("View Wallpaper", systemImage: "play.fill")
+                        Label("Set as Wallpaper", systemImage: "photo.on.rectangle")
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.regular)
