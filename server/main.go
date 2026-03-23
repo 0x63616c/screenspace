@@ -80,6 +80,7 @@ func main() {
 	// Authenticated routes
 	mux.Handle("GET /api/v1/auth/me", authMw(http.HandlerFunc(authHandler.Me)))
 	mux.Handle("POST /api/v1/wallpapers", authMw(uploadLimiter.Middleware(http.HandlerFunc(wallpaperHandler.Create))))
+	mux.Handle("POST /api/v1/wallpapers/{id}/download", authMw(http.HandlerFunc(wallpaperHandler.Download)))
 	mux.Handle("POST /api/v1/wallpapers/{id}/finalize", authMw(http.HandlerFunc(wallpaperHandler.Finalize)))
 	mux.Handle("DELETE /api/v1/wallpapers/{id}", authMw(http.HandlerFunc(wallpaperHandler.Delete)))
 	mux.Handle("POST /api/v1/wallpapers/{id}/favorite", authMw(http.HandlerFunc(favoriteHandler.Toggle)))

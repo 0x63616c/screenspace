@@ -345,7 +345,35 @@ func (h *WallpaperHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate download URL
+	resp := wallpaperToResponse(wp)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+type downloadResponse struct {
+	DownloadURL string `json:"download_url"`
+}
+
+func (h *WallpaperHandler) Download(w http.ResponseWriter, r *http.Request) {
+	claims := claimsFromRequest(r)
+	if claims == nil {
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	id := r.PathValue("id")
+	wp, err := h.wallpapers.GetByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, `{"error":"wallpaper not found"}`, http.StatusNotFound)
+		return
+	}
+
+	if wp.Status != "approved" {
+		http.Error(w, `{"error":"wallpaper not found"}`, http.StatusNotFound)
+		return
+	}
+
 	downloadURL, err := h.store.PreSignedURL(r.Context(), wp.StorageKey, 1*time.Hour)
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
@@ -354,11 +382,8 @@ func (h *WallpaperHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	h.wallpapers.IncrementDownloadCount(r.Context(), wp.ID)
 
-	resp := wallpaperToResponse(wp)
-	resp.DownloadURL = downloadURL
-
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	json.NewEncoder(w).Encode(downloadResponse{DownloadURL: downloadURL})
 }
 
 func (h *WallpaperHandler) Popular(w http.ResponseWriter, r *http.Request) {

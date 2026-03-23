@@ -373,8 +373,78 @@ func TestGetWallpaper_Success(t *testing.T) {
 	if resp.ID != wp.ID {
 		t.Fatalf("expected id %s, got %s", wp.ID, resp.ID)
 	}
+}
+
+func TestGetWallpaper_DoesNotIncrementDownloadCount(t *testing.T) {
+	env := newTestWallpaperHandler(t)
+	u := env.createUser(t, "get-noinc@example.com", "user")
+
+	wp := env.createApprovedWallpaper(t, "No Inc Test", "", u.ID)
+
+	// Get wallpaper multiple times
+	for range 3 {
+		req := httptest.NewRequest(http.MethodGet, "/wallpapers/"+wp.ID, nil)
+		req.SetPathValue("id", wp.ID)
+		w := httptest.NewRecorder()
+		env.handler.Get(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", w.Code)
+		}
+	}
+
+	// Verify download count is still 0
+	updated, err := env.wallpapers.GetByID(context.Background(), wp.ID)
+	if err != nil {
+		t.Fatalf("get wallpaper: %v", err)
+	}
+	if updated.DownloadCount != 0 {
+		t.Fatalf("expected download_count 0, got %d", updated.DownloadCount)
+	}
+}
+
+func TestDownloadWallpaper_IncrementsCount(t *testing.T) {
+	env := newTestWallpaperHandler(t)
+	u := env.createUser(t, "dl-inc@example.com", "user")
+
+	wp := env.createApprovedWallpaper(t, "DL Inc Test", "", u.ID)
+
+	w, r := env.authRequest(t, http.MethodPost, "/wallpapers/"+wp.ID+"/download", "", u.ID, "user")
+	r.SetPathValue("id", wp.ID)
+	env.handler.Download(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp downloadResponse
+	json.NewDecoder(w.Body).Decode(&resp)
 	if resp.DownloadURL == "" {
 		t.Fatal("expected non-empty download URL")
+	}
+
+	// Verify download count incremented
+	updated, err := env.wallpapers.GetByID(context.Background(), wp.ID)
+	if err != nil {
+		t.Fatalf("get wallpaper: %v", err)
+	}
+	if updated.DownloadCount != 1 {
+		t.Fatalf("expected download_count 1, got %d", updated.DownloadCount)
+	}
+}
+
+func TestDownloadWallpaper_Unauthorized(t *testing.T) {
+	env := newTestWallpaperHandler(t)
+	u := env.createUser(t, "dl-unauth@example.com", "user")
+
+	wp := env.createApprovedWallpaper(t, "DL Unauth Test", "", u.ID)
+
+	req := httptest.NewRequest(http.MethodPost, "/wallpapers/"+wp.ID+"/download", nil)
+	req.SetPathValue("id", wp.ID)
+	w := httptest.NewRecorder()
+	env.handler.Download(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
 	}
 }
 
