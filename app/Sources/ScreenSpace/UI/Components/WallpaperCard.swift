@@ -17,6 +17,8 @@ struct WallpaperCardData: Identifiable {
 struct WallpaperCard: View {
     let data: WallpaperCardData
     var onTap: (() -> Void)? = nil
+    var onSetWallpaper: (() -> Void)? = nil
+    var onFavorite: (() -> Void)? = nil
     @State private var isHovered = false
 
     var body: some View {
@@ -82,6 +84,17 @@ struct WallpaperCard: View {
         .frame(width: 200)
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if let onTap {
+                Button("View Details") { onTap() }
+            }
+            if let onSetWallpaper {
+                Button("Set as Wallpaper") { onSetWallpaper() }
+            }
+            if let onFavorite {
+                Button("Add to Favorites") { onFavorite() }
+            }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(data.title), \(ResolutionBadge.label(for: data.width, height: data.height)), \(data.durationLabel)")
         .accessibilityAddTraits(.isButton)
