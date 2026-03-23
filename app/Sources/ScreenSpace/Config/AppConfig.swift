@@ -17,7 +17,6 @@ struct AppConfig: Codable, Equatable {
     var launchAtLogin: Bool
     var pauseOnBattery: Bool
     var pauseOnFullscreen: Bool
-    var videoQuality: String
     var videoGravity: VideoGravityOption
     var cacheSizeLimitMB: Int
     var serverURL: String
@@ -35,7 +34,6 @@ struct AppConfig: Codable, Equatable {
         launchAtLogin: true,
         pauseOnBattery: true,
         pauseOnFullscreen: true,
-        videoQuality: "original",
         videoGravity: .resizeAspectFill,
         cacheSizeLimitMB: 5120,
         serverURL: defaultServerURL,
