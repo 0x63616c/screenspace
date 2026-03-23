@@ -122,13 +122,16 @@ All state stored locally as JSON.
 
 ```json
 {
+  "version": 1,
   "launchAtLogin": true,
   "pauseOnBattery": true,
   "pauseOnFullscreen": true,
   "videoQuality": "original",
+  "videoGravity": "resizeAspectFill",
   "cacheSizeLimitMB": 5120,
+  "serverURL": "https://api.screenspace.app",
   "screenAssignments": {
-    "<CGDirectDisplayID>": "<playlist-id>"
+    "<stable-display-id>": "<playlist-id>"
   }
 }
 ```
@@ -454,3 +457,124 @@ The app is non-sandboxed because:
 This means we cannot distribute via the Mac App Store, hence GitHub + Homebrew.
 
 Notarization is still required and achievable for non-sandboxed apps.
+
+---
+
+## 9. Auto-Update
+
+Menu bar apps are easy to forget about. Auto-update is critical, especially since the lock screen XPC integration is fragile and will need patches after macOS updates.
+
+- Use the **Sparkle** framework (standard for non-App Store Mac apps)
+- Appcast XML feed hosted alongside GitHub Releases
+- Check for updates automatically on launch (configurable interval, default daily)
+- User can also manually check via menu bar > "Check for Updates..."
+- Updates are downloaded and applied in-background, user prompted to restart
+- Delta updates supported by Sparkle to minimize download size
+- Sparkle handles code signature verification automatically
+
+---
+
+## 10. Trust & Safety
+
+Required before accepting any user uploads.
+
+### Content Policy
+
+Published as `CONTENT_POLICY.md` in the repo and linked during upload flow in the app.
+
+- No NSFW content
+- No copyrighted content without a license (uploaders must confirm they have rights)
+- No hateful, violent, or illegal content
+- Admins use this policy as the basis for approve/reject decisions
+
+### DMCA Process
+
+- Published contact email for takedown requests
+- On valid DMCA notice: remove content within 24 hours, notify uploader
+- Counter-notice process for disputed takedowns
+- Repeat infringers get banned
+
+### Privacy
+
+- Server stores: email, hashed password, upload history, IP addresses (for rate limiting)
+- No tracking, no analytics, no third-party data sharing
+- Users can request account deletion (removes all data including uploads)
+- Privacy policy published on the project website/repo
+- GDPR compliant: EU users can export or delete their data on request
+
+---
+
+## 11. Data Migration & Stability
+
+### Local Config Versioning
+
+- All JSON config files include a `"version"` field (starting at 1)
+- On app launch, check version and run upgrade-on-read migrations if needed
+- Migrations are sequential (v1 -> v2 -> v3), each a pure function transforming the JSON
+- If config is corrupted (invalid JSON), back up the broken file and reset to defaults with a user notification
+
+### Display Identification
+
+`CGDirectDisplayID` can change across reboots. Use a stable composite key instead:
+
+- Primary: `CGDisplayVendorNumber` + `CGDisplayModelNumber` + `CGDisplaySerialNumber`
+- Fallback: `CGDirectDisplayID` for displays without serial numbers (e.g. some third-party monitors)
+- Store mapping in config as the stable ID string, resolve to current `CGDirectDisplayID` at runtime
+
+### Postgres Migrations
+
+- Use `golang-migrate` for schema versioning
+- Migration files stored in `server/migrations/` as sequential numbered SQL files
+- Migrations run automatically on server startup
+- Never modify an existing migration, always create a new one
+
+---
+
+## 12. Self-Hosting
+
+The community gallery server is designed to be self-hostable.
+
+### App Configuration
+
+- `serverURL` field in `config.json` (default: `https://api.screenspace.app`)
+- Configurable in Settings > Gallery > Server URL
+- App connects to one server at a time
+
+### Server Setup
+
+Provide a `docker-compose.yml` in the repo:
+
+```yaml
+services:
+  server:
+    image: ghcr.io/0x63616c/screenspace-server:latest
+    ports: ["8080:8080"]
+    env_file: .env
+  postgres:
+    image: postgres:16
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+  minio:
+    image: minio/minio
+    command: server /data
+    volumes: ["s3data:/data"]
+volumes:
+  pgdata:
+  s3data:
+```
+
+### Required Environment Variables
+
+```
+DATABASE_URL=postgres://user:pass@postgres:5432/screenspace
+S3_ENDPOINT=http://minio:9000
+S3_BUCKET=screenspace
+S3_ACCESS_KEY=...
+S3_SECRET_KEY=...
+JWT_SECRET=...
+ADMIN_EMAIL=admin@example.com
+```
+
+### Documentation
+
+- `docs/self-hosting.md` with step-by-step setup guide
+- Covers: Docker, bare metal, Hetzner, common S3 providers (MinIO, Hetzner Object Storage, Cloudflare R2, AWS S3)
