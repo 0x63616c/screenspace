@@ -85,7 +85,7 @@ struct ExploreView: View {
             categories = try await appState.api.listCategories()
         } catch {
             // Fallback to known categories if API unavailable
-            categories = ["nature", "abstract", "urban", "cinematic", "space", "underwater", "minimal", "other"]
+            categories = CategoriesResponse.fallback
         }
     }
 

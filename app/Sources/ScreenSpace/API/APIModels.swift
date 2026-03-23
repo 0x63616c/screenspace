@@ -14,6 +14,9 @@ struct AuthResponse: Codable {
 // MARK: - Categories
 struct CategoriesResponse: Codable {
     let categories: [String]
+
+    /// Fallback categories used when the API is unavailable.
+    static let fallback = ["nature", "abstract", "urban", "cinematic", "space", "underwater", "minimal", "other"]
 }
 
 // MARK: - Wallpapers

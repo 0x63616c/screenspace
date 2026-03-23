@@ -117,7 +117,7 @@ struct UploadView: View {
             do {
                 categories = try await appState.api.listCategories()
             } catch {
-                categories = ["nature", "abstract", "urban", "cinematic", "space", "underwater", "minimal", "other"]
+                categories = CategoriesResponse.fallback
             }
         }
     }
