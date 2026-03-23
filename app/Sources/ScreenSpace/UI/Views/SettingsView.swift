@@ -45,6 +45,9 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private var playbackTab: some View {
@@ -67,6 +70,9 @@ struct SettingsView: View {
                 Text("Fit (letterbox)").tag(VideoGravityOption.resizeAspect)
             }
         }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private var storageTab: some View {
@@ -88,6 +94,9 @@ struct SettingsView: View {
                 cacheSize = 0
             }
         }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private var displaysTab: some View {
@@ -122,6 +131,9 @@ struct SettingsView: View {
                 }
             }
         }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private var accountTab: some View {
@@ -142,6 +154,9 @@ struct SettingsView: View {
                 .buttonStyle(.borderedProminent)
             }
         }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .frame(maxHeight: .infinity, alignment: .top)
         .sheet(isPresented: $showLogin) {
             LoginView()
         }
