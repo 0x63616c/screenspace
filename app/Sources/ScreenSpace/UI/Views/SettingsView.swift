@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var cacheSize = CacheManager.shared.currentCacheSizeMB()
     @State private var serverURL: String = ConfigManager.shared.config.serverURL
     @State private var showLogin = false
+    @State private var settingsError: String?
 
     var body: some View {
         TabView {
@@ -18,6 +19,16 @@ struct SettingsView: View {
         }
         .frame(width: 500, height: 400)
         .padding()
+        .alert("Error", isPresented: Binding(
+            get: { settingsError != nil },
+            set: { if !$0 { settingsError = nil } }
+        )) {
+            Button("OK") { settingsError = nil }
+        } message: {
+            if let settingsError {
+                Text(settingsError)
+            }
+        }
     }
 
     private var generalTab: some View {
@@ -26,10 +37,14 @@ struct SettingsView: View {
                 get: { config.launchAtLogin },
                 set: { newValue in
                     config.launchAtLogin = newValue
-                    if newValue {
-                        try? SMAppService.mainApp.register()
-                    } else {
-                        try? SMAppService.mainApp.unregister()
+                    do {
+                        if newValue {
+                            try SMAppService.mainApp.register()
+                        } else {
+                            try SMAppService.mainApp.unregister()
+                        }
+                    } catch {
+                        settingsError = "Failed to \(newValue ? "enable" : "disable") launch at login: \(error.localizedDescription)"
                     }
                     saveConfig()
                 }
@@ -106,13 +121,10 @@ struct SettingsView: View {
 
             ForEach(NSScreen.screens, id: \.self) { screen in
                 let displayID = DisplayIdentifier.stableID(for: screen)
-                let name = screen.localizedName
 
                 HStack {
-                    VStack(alignment: .leading) {
-                        Text(name)
-                            .font(.body)
-                    }
+                    Text(screen.localizedName)
+                        .font(.body)
                     Spacer()
 
                     Picker("Playlist", selection: Binding(
