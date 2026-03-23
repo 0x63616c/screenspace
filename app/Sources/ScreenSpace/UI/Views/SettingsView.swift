@@ -95,11 +95,11 @@ struct SettingsView: View {
             HStack {
                 Text("Cache size")
                 Spacer()
-                Text("\(cacheSize) MB")
+                Text(formatSize(cacheSize))
                     .foregroundStyle(.secondary)
             }
 
-            Stepper("Cache limit: \(config.cacheSizeLimitMB) MB", value: Binding(
+            Stepper("Cache limit: \(formatSize(config.cacheSizeLimitMB))", value: Binding(
                 get: { config.cacheSizeLimitMB },
                 set: { config.cacheSizeLimitMB = $0; saveConfig() }
             ), in: 1024...20480, step: 1024)
@@ -176,5 +176,12 @@ struct SettingsView: View {
 
     private func saveConfig() {
         try? ConfigManager.shared.update { $0 = config }
+    }
+
+    private func formatSize(_ mb: Int) -> String {
+        if mb >= 1024 {
+            return String(format: "%.1f GB", Double(mb) / 1024.0)
+        }
+        return "\(mb) MB"
     }
 }
