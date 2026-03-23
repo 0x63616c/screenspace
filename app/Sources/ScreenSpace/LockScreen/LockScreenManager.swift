@@ -1,7 +1,7 @@
 import AVFoundation
 import AppKit
 
-final class LockScreenManager {
+final class LockScreenManager: Sendable {
     enum LockScreenError: Error, LocalizedError {
         case noGeneratedUID
         case frameExtractionFailed

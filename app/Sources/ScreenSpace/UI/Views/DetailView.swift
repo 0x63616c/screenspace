@@ -69,6 +69,12 @@ struct DetailView: View {
                             .buttonStyle(.borderedProminent)
                             .controlSize(.regular)
 
+                            Button(action: setAsLockScreen) {
+                                Label("Lock Screen", systemImage: "lock.rectangle")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
+
                             if isDownloading {
                                 ProgressView(value: downloadProgress)
                                     .frame(width: 100)
@@ -135,6 +141,16 @@ struct DetailView: View {
 
     private var formattedDuration: String {
         "\(Int(wallpaper.duration))s"
+    }
+
+    private func setAsLockScreen() {
+        Task {
+            guard let cached = CacheManager.shared.cachedURL(for: wallpaper.id) else {
+                return
+            }
+            let lockScreenManager = appState.lockScreen
+            try? await lockScreenManager.setLockScreen(from: cached)
+        }
     }
 
     private func setAsWallpaper() {
