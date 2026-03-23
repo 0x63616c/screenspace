@@ -14,6 +14,7 @@ struct UploadView: View {
     @State private var uploadProgress: Double = 0
     @State private var errorMessage: String?
     @State private var uploadComplete = false
+    @State private var categories: [String] = []
 
     var body: some View {
         VStack(spacing: Spacing.lg) {
@@ -58,7 +59,7 @@ struct UploadView: View {
 
             Picker("Category", selection: $category) {
                 Text("Select category").tag("")
-                ForEach(["nature", "abstract", "urban", "cinematic", "space", "underwater", "minimal", "other"], id: \.self) { cat in
+                ForEach(categories, id: \.self) { cat in
                     Text(cat.capitalized).tag(cat)
                 }
             }
@@ -112,6 +113,13 @@ struct UploadView: View {
         }
         .padding()
         .frame(width: 400)
+        .task {
+            do {
+                categories = try await appState.api.listCategories()
+            } catch {
+                categories = ["nature", "abstract", "urban", "cinematic", "space", "underwater", "minimal", "other"]
+            }
+        }
     }
 
     private var canUpload: Bool {
