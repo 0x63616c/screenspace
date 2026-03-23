@@ -247,6 +247,72 @@ func TestCreateWallpaper_TagTooLong(t *testing.T) {
 	}
 }
 
+func TestCreateWallpaper_InvalidCategory(t *testing.T) {
+	env := newTestWallpaperHandler(t)
+	u := env.createUser(t, "create-badcat@example.com", "user")
+
+	body := `{"title":"Test","category":"bogus"}`
+	w, r := env.authRequest(t, http.MethodPost, "/wallpapers", body, u.ID, "user")
+	env.handler.Create(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCreateWallpaper_CategoryNormalized(t *testing.T) {
+	env := newTestWallpaperHandler(t)
+	u := env.createUser(t, "create-catcase@example.com", "user")
+
+	body := `{"title":"Cat Case Test","category":"Nature"}`
+	w, r := env.authRequest(t, http.MethodPost, "/wallpapers", body, u.ID, "user")
+	env.handler.Create(w, r)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp createWallpaperResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+
+	wp, err := env.wallpapers.GetByID(context.Background(), resp.ID)
+	if err != nil {
+		t.Fatalf("get wallpaper: %v", err)
+	}
+	if wp.Category != "nature" {
+		t.Fatalf("expected category 'nature', got '%s'", wp.Category)
+	}
+}
+
+func TestCreateWallpaper_EmptyCategory(t *testing.T) {
+	env := newTestWallpaperHandler(t)
+	u := env.createUser(t, "create-nocat@example.com", "user")
+
+	body := `{"title":"No Cat Test"}`
+	w, r := env.authRequest(t, http.MethodPost, "/wallpapers", body, u.ID, "user")
+	env.handler.Create(w, r)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestListCategories(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/categories", nil)
+	w := httptest.NewRecorder()
+	ListCategories(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp categoriesResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+	if len(resp.Categories) != len(ValidCategories) {
+		t.Fatalf("expected %d categories, got %d", len(ValidCategories), len(resp.Categories))
+	}
+}
+
 func TestCreateWallpaper_Unauthorized(t *testing.T) {
 	env := newTestWallpaperHandler(t)
 

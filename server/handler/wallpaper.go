@@ -7,12 +7,15 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/0x63616c/screenspace/server/repository"
 	"github.com/0x63616c/screenspace/server/service"
 	"github.com/0x63616c/screenspace/server/storage"
 )
+
+var ValidCategories = []string{"nature", "abstract", "urban", "cinematic", "space", "underwater", "minimal", "other"}
 
 type WallpaperHandler struct {
 	wallpapers *repository.WallpaperRepo
@@ -79,6 +82,22 @@ func (h *WallpaperHandler) Create(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, `{"error":"each tag must be 50 characters or fewer"}`, http.StatusBadRequest)
 			return
 		}
+	}
+
+	if req.Category != "" {
+		normalized := strings.ToLower(req.Category)
+		valid := false
+		for _, c := range ValidCategories {
+			if c == normalized {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			http.Error(w, `{"error":"invalid category"}`, http.StatusBadRequest)
+			return
+		}
+		req.Category = normalized
 	}
 
 	storageKey := fmt.Sprintf("wallpapers/%s/original.mp4", "pending")

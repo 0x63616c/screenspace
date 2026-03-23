@@ -72,6 +72,7 @@ func main() {
 	})
 	mux.HandleFunc("POST /api/v1/auth/register", authHandler.Register)
 	mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
+	mux.HandleFunc("GET /api/v1/categories", handler.ListCategories)
 	mux.HandleFunc("GET /api/v1/wallpapers", wallpaperHandler.List)
 	mux.HandleFunc("GET /api/v1/wallpapers/popular", wallpaperHandler.Popular)
 	mux.HandleFunc("GET /api/v1/wallpapers/recent", wallpaperHandler.Recent)

@@ -131,7 +131,7 @@ func (r *WallpaperRepo) List(ctx context.Context, p ListParams) ([]*Wallpaper, i
 	argN++
 
 	if p.Category != "" {
-		conditions = append(conditions, fmt.Sprintf("category = $%d", argN))
+		conditions = append(conditions, fmt.Sprintf("category ILIKE $%d", argN))
 		args = append(args, p.Category)
 		argN++
 	}
