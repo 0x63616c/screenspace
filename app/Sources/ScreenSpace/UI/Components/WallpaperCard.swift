@@ -19,11 +19,19 @@ struct WallpaperCard: View {
     @State private var isHovered = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .topTrailing) {
-                // Thumbnail
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.3))
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.gray.opacity(0.2),
+                                Color.gray.opacity(0.1),
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
                     .aspectRatio(16/9, contentMode: .fit)
                     .overlay {
                         if let url = data.thumbnailURL {
@@ -31,29 +39,40 @@ struct WallpaperCard: View {
                                 image.resizable().scaledToFill()
                             } placeholder: {
                                 ProgressView()
+                                    .scaleEffect(0.5)
                             }
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        } else {
+                            Image(systemName: "play.circle.fill")
+                                .font(.title2)
+                                .foregroundStyle(.white.opacity(0.3))
                         }
                     }
 
-                // Resolution badge
                 ResolutionBadge(width: data.width, height: data.height)
-                    .padding(6)
+                    .padding(8)
             }
-            .scaleEffect(isHovered ? 1.05 : 1.0)
-            .animation(.easeInOut(duration: 0.2), value: isHovered)
+            .scaleEffect(isHovered ? 1.04 : 1.0)
+            .shadow(
+                color: .black.opacity(isHovered ? 0.2 : 0.05),
+                radius: isHovered ? 12 : 4,
+                x: 0,
+                y: isHovered ? 6 : 2
+            )
+            .animation(.easeOut(duration: 0.15), value: isHovered)
             .onHover { hovering in
                 isHovered = hovering
             }
 
             Text(data.title)
-                .font(.caption)
+                .font(.subheadline)
+                .fontWeight(.medium)
                 .lineLimit(1)
 
             Text(data.durationLabel)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
-        .frame(width: 180)
+        .frame(width: 200)
     }
 }

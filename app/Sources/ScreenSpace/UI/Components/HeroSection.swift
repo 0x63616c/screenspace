@@ -5,45 +5,75 @@ struct HeroSection: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            // Background
-            RoundedRectangle(cornerRadius: 16)
+            // Background gradient (will be replaced with video preview)
+            RoundedRectangle(cornerRadius: 20)
                 .fill(
                     LinearGradient(
-                        colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
+                        colors: [
+                            Color(red: 0.1, green: 0.15, blue: 0.3),
+                            Color(red: 0.15, green: 0.1, blue: 0.25),
+                        ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .frame(height: 300)
-
-            // Content overlay
-            GlassCard {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("FEATURED")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.secondary)
-
-                    Text(wallpaper?.title ?? "No wallpapers yet")
-                        .font(.title)
-                        .fontWeight(.bold)
-
-                    if let wp = wallpaper {
-                        HStack(spacing: 8) {
-                            ResolutionBadge(width: wp.width, height: wp.height)
-                            Text(wp.durationLabel)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Button("View Wallpaper") { }
-                        .buttonStyle(.bordered)
+                .frame(height: 340)
+                .overlay {
+                    // Noise texture overlay for depth
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(.ultraThinMaterial.opacity(0.1))
                 }
-                .padding()
+
+            // Content overlay - glass card floating at bottom
+            VStack(alignment: .leading, spacing: 10) {
+                Text("FEATURED")
+                    .font(.caption)
+                    .fontWeight(.heavy)
+                    .tracking(1.5)
+                    .foregroundStyle(.white.opacity(0.6))
+
+                Text(wallpaper?.title ?? "No wallpapers yet")
+                    .font(.system(size: 28, weight: .bold, design: .default))
+                    .foregroundStyle(.white)
+
+                if let wp = wallpaper {
+                    HStack(spacing: 12) {
+                        ResolutionBadge(width: wp.width, height: wp.height)
+                        Text(wp.durationLabel)
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    Button(action: {}) {
+                        Label("View Wallpaper", systemImage: "play.fill")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.plain)
+                    .background {
+                        Capsule().fill(.white)
+                    }
+                    .foregroundStyle(.black)
+
+                    Button(action: {}) {
+                        Image(systemName: "heart")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .padding(8)
+                    }
+                    .buttonStyle(.plain)
+                    .background {
+                        Circle().fill(.ultraThinMaterial)
+                    }
+                    .foregroundStyle(.white)
+                }
+                .padding(.top, 4)
             }
-            .padding()
+            .padding(24)
         }
-        .padding(.horizontal)
     }
 }

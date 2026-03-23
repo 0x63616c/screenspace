@@ -12,11 +12,17 @@ struct ResolutionBadge: View {
 
     var body: some View {
         Text(label)
-            .font(.caption2)
-            .fontWeight(.bold)
+            .font(.system(size: 10, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
             .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(.ultraThinMaterial)
-            .cornerRadius(4)
+            .padding(.vertical, 3)
+            .background {
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(.white.opacity(0.2), lineWidth: 0.5)
+                    }
+            }
     }
 }

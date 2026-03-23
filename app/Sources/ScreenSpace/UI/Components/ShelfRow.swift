@@ -5,19 +5,28 @@ struct ShelfRow: View {
     let wallpapers: [WallpaperCardData]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.title3)
-                .fontWeight(.semibold)
-                .padding(.horizontal)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(title)
+                    .font(.title3)
+                    .fontWeight(.bold)
+
+                Spacer()
+
+                Button("See All") {}
+                    .buttonStyle(.plain)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 20)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
+                LazyHStack(spacing: 14) {
                     ForEach(wallpapers) { wallpaper in
                         WallpaperCard(data: wallpaper)
                     }
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, 20)
             }
         }
     }
