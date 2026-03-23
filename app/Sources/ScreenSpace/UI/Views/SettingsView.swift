@@ -28,16 +28,7 @@ struct SettingsView: View {
         }
         .frame(width: 500, height: 400)
         .padding()
-        .alert("Error", isPresented: Binding(
-            get: { settingsError != nil },
-            set: { if !$0 { settingsError = nil } }
-        )) {
-            Button("OK") { settingsError = nil }
-        } message: {
-            if let settingsError {
-                Text(settingsError)
-            }
-        }
+        .errorAlert(message: $settingsError)
     }
 
     private var generalTab: some View {
