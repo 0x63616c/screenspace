@@ -205,7 +205,15 @@ GET    /api/v1/auth/me                 # Current user info
 
 GET    /api/v1/admin/queue             # Pending uploads (admin only)
 POST   /api/v1/admin/queue/:id/approve
-POST   /api/v1/admin/queue/:id/reject
+POST   /api/v1/admin/queue/:id/reject  # Includes reason field
+GET    /api/v1/admin/wallpapers        # All wallpapers incl. pending/rejected
+PATCH  /api/v1/admin/wallpapers/:id    # Edit metadata (title, category, tags)
+GET    /api/v1/admin/users             # List/search users
+POST   /api/v1/admin/users/:id/ban     # Ban user (can't upload)
+POST   /api/v1/admin/users/:id/unban
+POST   /api/v1/admin/users/:id/promote # Promote to admin
+GET    /api/v1/admin/reports            # List flagged content
+POST   /api/v1/admin/reports/:id/dismiss
 ```
 
 ### Upload Flow
@@ -294,11 +302,35 @@ type Store interface {
 
 Implemented for S3-compatible storage. Swapping providers is a config change.
 
-### Auth
+### Roles & Auth
 
+**Roles:**
+- **user** - Browse, download, upload (pending review), favorite, report
+- **admin** - All user permissions, plus: approve/reject uploads, remove wallpapers, edit metadata, ban/unban users, promote users to admin
+
+**Role mechanics:**
+- Stored in `users.role` column (`user` or `admin`)
+- JWT token includes role claim, server middleware checks role on `/admin/*` endpoints
+- First account created gets `admin` role (or seed via `ADMIN_EMAIL` env var on first server boot)
+- Additional admins promoted by existing admins
+
+**Auth:**
 - Simple JWT (no OAuth for v1)
 - macOS app stores token in Keychain
 - Rate limiting on uploads: 5/day per user
+- Banned users receive a 403 on upload attempts
+
+### Admin UI (in macOS App)
+
+When an admin user is logged in, the gallery window shows an additional "Admin" tab with:
+
+**Moderation Queue** - List of pending uploads with video preview, uploader info, metadata. One-click approve/reject. Reject includes a reason field sent to the uploader.
+
+**Content Management** - Search/browse all wallpapers including rejected and pending. Remove any wallpaper. Edit metadata (title, category, tags).
+
+**User Management** - List and search users by email. Ban/unban users. Promote users to admin.
+
+**Reports** - List of flagged wallpapers with report reasons and reporter info. Quick actions: dismiss report, remove wallpaper, ban uploader.
 
 ### Downloads
 
