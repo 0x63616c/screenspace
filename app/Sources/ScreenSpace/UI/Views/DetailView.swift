@@ -1,9 +1,13 @@
 import SwiftUI
 
 struct DetailView: View {
+    @Environment(AppState.self) var appState
     let wallpaper: WallpaperResponse
     @State private var isDownloading = false
     @State private var downloadProgress: Double = 0
+    @State private var isFavorited = false
+    @State private var showReportSheet = false
+    @State private var reportReason = ""
 
     var body: some View {
         ScrollView {
@@ -70,13 +74,21 @@ struct DetailView: View {
                                     .frame(width: 100)
                             }
 
-                            Button(action: {}) {
-                                Image(systemName: "heart")
+                            Button(action: {
+                                guard appState.isLoggedIn else { return }
+                                Task {
+                                    isFavorited = try await appState.api.toggleFavorite(id: wallpaper.id)
+                                }
+                            }) {
+                                Image(systemName: isFavorited ? "heart.fill" : "heart")
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.regular)
 
-                            Button(action: {}) {
+                            Button(action: {
+                                guard appState.isLoggedIn else { return }
+                                showReportSheet = true
+                            }) {
                                 Image(systemName: "flag")
                             }
                             .buttonStyle(.bordered)
@@ -87,6 +99,32 @@ struct DetailView: View {
                 }
             }
             .padding()
+        }
+        .sheet(isPresented: $showReportSheet) {
+            VStack(spacing: 16) {
+                Text("Report Wallpaper")
+                    .font(.headline)
+                TextField("Reason for reporting", text: $reportReason)
+                    .textFieldStyle(.roundedBorder)
+                HStack {
+                    Button("Cancel") {
+                        reportReason = ""
+                        showReportSheet = false
+                    }
+                    .buttonStyle(.bordered)
+                    Button("Submit") {
+                        Task {
+                            try? await appState.api.reportWallpaper(id: wallpaper.id, reason: reportReason)
+                            reportReason = ""
+                            showReportSheet = false
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(reportReason.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .padding()
+            .frame(width: 350)
         }
     }
 
@@ -100,7 +138,28 @@ struct DetailView: View {
     }
 
     private func setAsWallpaper() {
-        // Will download if community, then set via WallpaperEngine
+        Task {
+            if let cachedURL = CacheManager.shared.cachedURL(for: wallpaper.id) {
+                appState.setWallpaper(url: cachedURL, title: wallpaper.title)
+                return
+            }
+
+            guard let downloadURLString = wallpaper.downloadURL,
+                  let downloadURL = URL(string: downloadURLString) else { return }
+
+            isDownloading = true
+            downloadProgress = 0
+
+            do {
+                let (tempURL, _) = try await URLSession.shared.download(from: downloadURL, delegate: nil)
+                let cachedURL = try CacheManager.shared.cacheFile(from: tempURL, wallpaperID: wallpaper.id)
+                appState.setWallpaper(url: cachedURL, title: wallpaper.title)
+            } catch {
+                // Download failed silently for now
+            }
+
+            isDownloading = false
+        }
     }
 }
 

@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct LibraryView: View {
+    @Environment(AppState.self) var appState
     @State private var localVideos: [URL] = []
     @State private var isDragOver = false
 
@@ -91,6 +92,6 @@ struct LibraryView: View {
     }
 
     private func setWallpaper(url: URL) {
-        // This will be wired to WallpaperEngine via environment or shared state
+        appState.setWallpaper(url: url, title: url.lastPathComponent)
     }
 }
