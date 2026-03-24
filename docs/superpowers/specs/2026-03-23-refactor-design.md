@@ -1,7 +1,36 @@
 # ScreenSpace Refactor & Hardening Spec
 
 **Date:** 2026-03-23
+**Updated:** 2026-03-24 (post-review)
 **Scope:** Full-stack refactor of server (Go) and app (Swift) for production-grade quality, testability, security, and vibe-coding ergonomics.
+
+---
+
+## Toolchain
+
+- **Go:** 1.26 (managed via mise, `mise.toml` in project root)
+- **Swift:** 6.0+ (swift-tools-version: 6.0, Xcode 26+)
+- **Generated code** (sqlc output in `db/generated/`, oapi-codegen output in `generated/`) is committed to git. CI verifies `make generate` produces no diff.
+
+### Go 1.24-1.26 Idioms (mandatory)
+
+**From 1.24:**
+- `omitzero` over `omitempty` in all JSON struct tags. `omitempty` is broken for `time.Time` and zero-value numerics.
+- `t.Context()` in all tests instead of `context.Background()`.
+- `slog.DiscardHandler` in test setup for no-op logging.
+
+**From 1.25:**
+- `sync.WaitGroup.Go()` instead of manual Add(1)/go/Done() patterns.
+- `http.CrossOriginProtection` for CSRF if/when browser-based clients are added. Not needed for native app API-only usage (no cookies, no forms). Add to security headers middleware as a no-op placeholder with a comment explaining when to enable.
+- `runtime/trace.FlightRecorder` for production ring-buffer tracing (replaces pprof for intermittent debugging).
+- `testing/synctest` for deterministic concurrent test patterns.
+
+**From 1.26:**
+- `errors.AsType[T]()` instead of declaring a target variable for `errors.As()`. Cleaner, type-safe error handling.
+- `slog.NewMultiHandler()` for fanning logs to multiple destinations.
+- Green Tea GC is now default (10-40% less GC overhead, no action needed).
+- `os/signal.NotifyContext()` now reports which signal cancelled (better graceful shutdown logging).
+- `io.ReadAll()` is ~2x faster with ~50% less allocation (benefits request body reading).
 
 ---
 
@@ -33,7 +62,7 @@ Replace `net/http.ServeMux` with chi. Route groups for public, authenticated, an
 /api/v1
   Public (ipLimiter: 120/min per IP)
     GET  /health
-    GET  /categories
+    GET  /categories          (not paginated, returns flat array of all categories)
     GET  /wallpapers
     GET  /wallpapers/popular
     GET  /wallpapers/recent
@@ -45,7 +74,7 @@ Replace `net/http.ServeMux` with chi. Route groups for public, authenticated, an
 
   Authenticated (authMw + userLimiter: 30/min per user)
     GET  /auth/me
-    POST /wallpapers/{id}/download
+    POST /wallpapers/{id}/download  (downloadLimiter: 60/hour per user)
     POST /wallpapers/{id}/favorite
     POST /wallpapers/{id}/report
     POST /wallpapers (uploadLimiter: 5/day)
@@ -71,6 +100,8 @@ Delete `requireAdmin()` function. Admin middleware handles it.
 
 Replace `lib/pq` + `database/sql` with `pgx/v5`.
 
+**Migration strategy:** Atomic swap in a single commit. lib/pq and pgx cannot safely coexist (different driver registration, different error types). One commit replaces all `database/sql` calls with pgxpool, removes `lib/pq` from go.mod, runs `go mod tidy`. All repository code must be rewritten to sqlc simultaneously (Phase 1.2 + 1.3 are one unit of work).
+
 **What changes:**
 - `sql.Open("postgres", ...)` becomes `pgxpool.New(ctx, connString)`
 - `pq.Array()` becomes native pgx array support
@@ -95,7 +126,7 @@ version: "2"
 sql:
   - engine: "postgresql"
     queries: "queries/"
-    schema: "../migrations/"
+    schema: "migrations/"
     gen:
       go:
         package: "db"
@@ -110,16 +141,22 @@ sql:
 - `db/queries/favorite.sql` - CheckFavorite, InsertFavorite, DeleteFavorite, ListFavoritesByUser, CountFavoritesByUser
 - `db/queries/report.sql` - CreateReport, ListPendingReports, CountPendingReports, DismissReport
 
-Dynamic query pattern for ListWallpapers:
+Use separate queries per sort order instead of dynamic CASE WHEN (cleaner, avoids NULL ordering ambiguity):
 ```sql
--- name: ListWallpapers :many
+-- name: ListWallpapersRecent :many
 SELECT ... FROM wallpapers
 WHERE status = sqlc.arg('status')
   AND (sqlc.narg('category')::text IS NULL OR category ILIKE sqlc.narg('category'))
   AND (sqlc.narg('query')::text IS NULL OR title ILIKE sqlc.narg('query'))
-ORDER BY
-  CASE WHEN sqlc.arg('sort')::text = 'popular' THEN download_count END DESC,
-  CASE WHEN sqlc.arg('sort')::text != 'popular' THEN created_at END DESC
+ORDER BY created_at DESC
+LIMIT sqlc.arg('lim') OFFSET sqlc.arg('off');
+
+-- name: ListWallpapersPopular :many
+SELECT ... FROM wallpapers
+WHERE status = sqlc.arg('status')
+  AND (sqlc.narg('category')::text IS NULL OR category ILIKE sqlc.narg('category'))
+  AND (sqlc.narg('query')::text IS NULL OR title ILIKE sqlc.narg('query'))
+ORDER BY download_count DESC, created_at DESC
 LIMIT sqlc.arg('lim') OFFSET sqlc.arg('off');
 ```
 
@@ -146,8 +183,13 @@ output: generated/server.gen.go
 generate:
   chi-server: true
   models: true
-  strict-server: true
 ```
+
+> **Note:** Do NOT use `strict-server: true`. Strict mode generates typed response unions that conflict with the handler adapter pattern (1.6) where handlers return `error` and use `respond.JSON()`. Regular `chi-server` mode generates the route interface while allowing custom response handling.
+
+**Swift client generation:**
+
+Use [swift-openapi-generator](https://github.com/apple/swift-openapi-generator) to generate Swift API types from the same `api/openapi.yaml`. This replaces `APIModels.swift`. Add as a SwiftPM build plugin in `Package.swift`.
 
 ### 1.5 Service Layer
 
@@ -164,7 +206,35 @@ New layer between handlers and repositories for business logic.
 - All validation logic (now partially handled by oapi-codegen, remainder in services)
 - S3 orchestration (presigned URLs, upload/download coordination)
 - Business rules (ownership checks, status transitions)
-- The entire Finalize flow (currently 130 lines in one handler method)
+- The entire Finalize flow (see below)
+
+**Finalize service flow** (`WallpaperService.Finalize(ctx, wallpaperID, userID)`):
+1. Get wallpaper by ID. Return `ErrNotFound` if missing.
+2. Verify `uploaderID == userID`. Return `ErrForbidden` if not owner.
+3. Verify status is `pending`. Return `ErrBadRequest` if not (idempotent re-finalize not allowed).
+4. Download original video from S3 (`wallpapers/{id}/original.mp4`) to temp file. Use `io.LimitReader(reader, cfg.MaxFileSize+1)` to cap download size.
+5. Probe video via `VideoService.Probe()`. Returns width, height, duration, file size, codec.
+6. Validate constraints from config:
+   - `info.Size <= cfg.MaxFileSize` (default 200MB)
+   - `info.Duration <= cfg.MaxDuration` (default 60s)
+   - `info.Height >= cfg.MinHeight` (default 1080)
+   - `info.Format` is "h264" or "h265"
+   - Return `ErrBadRequest` with specific message for each violation.
+7. Generate thumbnail via `VideoService.GenerateThumbnail()` -> temp file.
+8. Generate preview clip via `VideoService.GeneratePreview()` -> temp file.
+9. Upload thumbnail to S3 (`wallpapers/{id}/thumbnail.jpg`, content-type `image/jpeg`).
+10. Upload preview to S3 (`wallpapers/{id}/preview.mp4`, content-type `video/mp4`).
+11. Update DB: width, height, duration, file size, format, resolution string, thumbnail key, preview key, status = `pending_review`.
+12. Clean up all temp files (deferred).
+13. Return updated wallpaper.
+
+**Error handling:** Steps 4-10 can fail independently. On S3 upload failure, the wallpaper stays in `pending` status and user can retry. Temp file cleanup must happen regardless (defer).
+
+**Admin promotion** (`POST /admin/users/{id}/promote`):
+- Sets `role = admin`. Idempotent (promoting an existing admin is a no-op).
+- Cannot promote banned users (return `ErrBadRequest`).
+- `ADMIN_EMAIL` auto-promotes at registration only (bootstrap). After that, admins use this endpoint.
+- No demote endpoint. Add later if needed.
 
 Handlers become:
 ```go
@@ -180,7 +250,7 @@ func (h *WallpaperHandler) Get(w http.ResponseWriter, r *http.Request) error {
 
 ### 1.6 Handler Adapter + Respond Package
 
-**Handler adapter:**
+**Handler adapter** (`internal/handler/adapter.go`):
 Handlers return `error`. Wrapper maps errors to HTTP responses.
 
 ```go
@@ -254,6 +324,20 @@ const (
     StatusApproved      WallpaperStatus = "approved"
     StatusRejected      WallpaperStatus = "rejected"
 )
+```
+
+**Wallpaper status transitions (enforced in service layer):**
+```
+pending --> pending_review  (on finalize: video validated, thumbnail generated)
+pending_review --> approved (admin approve)
+pending_review --> rejected (admin reject)
+rejected --> (terminal, no further transitions)
+approved --> (terminal, no further transitions)
+```
+
+No other transitions are legal. Service methods must validate the current status before updating.
+
+```go
 
 type UserRole string
 const (
@@ -411,19 +495,23 @@ w.Header().Set("Content-Security-Policy", "default-src 'none'")
 - `IncrementDownloadCount` error logged
 - `Popular`/`Recent` handlers refactored to not mutate request URL
 
-### 1.12 pprof
+### 1.12 Debug Server
 
 ```go
-// Internal-only debug server (not exposed publicly)
+// Internal-only debug server, bound to localhost only
 go func() {
     debugMux := http.NewServeMux()
     debugMux.HandleFunc("/debug/pprof/", pprof.Index)
     debugMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-    http.ListenAndServe(":6060", debugMux)
+    http.ListenAndServe("127.0.0.1:6060", debugMux)
 }()
 ```
 
-Enabled via `PPROF_ENABLED=true` env var.
+Enabled via `DEBUG_ENABLED=true` env var. Must bind to `127.0.0.1`, never `0.0.0.0`.
+
+For intermittent production issues, prefer `runtime/trace.FlightRecorder` (Go 1.25+) over pprof. FlightRecorder maintains a ring buffer of trace data that can be dumped on-demand when something goes wrong, without the overhead of continuous profiling.
+
+For goroutine leak detection in development, use the standard `/debug/pprof/goroutine` endpoint with `?debug=1` to inspect blocked goroutines.
 
 ---
 
@@ -706,7 +794,7 @@ pre-commit:
     go-lint:
       root: server/
       glob: "*.go"
-      run: golangci-lint run --fix
+      run: golangci-lint run
     swift-format:
       root: app/
       glob: "*.swift"
@@ -724,7 +812,7 @@ pre-commit:
 
 **Enabled linters:**
 - Defaults: `errcheck`, `govet`, `staticcheck`, `unused`, `ineffassign`, `gosimple`
-- Error handling: `errorlint`, `wrapcheck`
+- Error handling: `errorlint` (NOT `wrapcheck`, it conflicts with sentinel error returns in the handler adapter pattern)
 - Security: `gosec`
 - Performance: `bodyclose`, `perfsprint`
 - Style: `revive`, `misspell`, `unconvert`, `nakedret`
@@ -790,7 +878,7 @@ tools:          ## Install required dev tools
 ### 3.7 Dockerfile
 
 ```dockerfile
-FROM golang:1.23-alpine AS builder
+FROM golang:1.26-alpine AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
@@ -834,7 +922,9 @@ if err != nil || user.Banned {
 }
 ```
 
-Consider caching this check (Redis or in-memory TTL cache) to avoid a DB query on every authenticated request.
+**Performance:** Use an in-memory TTL cache (e.g., `sync.Map` with expiry or a small LRU) with a 60-second TTL to avoid a DB query on every authenticated request. Cache miss falls through to DB. On ban, the cache entry is evicted immediately for that user.
+
+**Token invalidation tradeoff (documented, accepted):** Banning a user does NOT revoke their JWT. The per-request banned check catches them on their very next API call, so the effective window is near-zero. We accept this rather than adding token refresh complexity. If token refresh rotation is needed later, it's defined in Phase 7.2 (Auth Evolution). No action needed now.
 
 ### 4.3 Upload Security
 
@@ -911,7 +1001,9 @@ struct HomeViewModelTests {
 }
 ```
 
-### 5.3 Swift: Snapshot Testing
+### 5.3 Swift: Snapshot Testing (post-refactor)
+
+> **Deferred until after the refactor stabilizes.** Snapshot tests break on every UI change (typography, spacing, accessibility labels). During an active refactor they create CI noise. Add snapshot tests after Phases 1-4 are complete and UI components are stable.
 
 ```swift
 @Test("home view matches snapshot")
@@ -963,7 +1055,7 @@ periphery scan --project app/Package.swift
 
 | Issue | Fix |
 |---|---|
-| `go 1.25.0` in go.mod | Fix to actual version (1.23) |
+| `go 1.25.0` in go.mod | Already updated to 1.26 (see Toolchain section) |
 | `ListByUser` scans different columns | Unify with sqlc-generated code |
 | `Popular`/`Recent` mutate request URL | Refactor to pass params directly |
 | Missing error wrapping in storage | Add context to all error returns |
@@ -1169,8 +1261,7 @@ app/Sources/ScreenSpace/
     DisplayIdentifier.swift
   Core/
     API/
-      APIClient.swift
-      APIModels.swift       # or generated from openapi.yaml
+      APIClient.swift       # generated types come from swift-openapi-generator
     Config/
       AppConfig.swift
     Cache/
