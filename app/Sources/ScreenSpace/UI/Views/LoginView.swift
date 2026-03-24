@@ -3,27 +3,52 @@ import SwiftUI
 struct LoginView: View {
     @Environment(AppState.self) var appState
     @Environment(\.dismiss) var dismiss
-    @State private var email = ""
-    @State private var password = ""
-    @State private var isRegistering = false
-    @State private var isLoading = false
-    @State private var errorMessage: String?
+    @State private var viewModel: LoginViewModel?
+
+    var body: some View {
+        Group {
+            if let viewModel {
+                LoginContentView(viewModel: viewModel, dismiss: dismiss)
+            } else {
+                ProgressView()
+            }
+        }
+        .frame(width: 350)
+        .padding()
+        .task {
+            if viewModel == nil {
+                let vm = LoginViewModel(api: appState.apiService, eventLog: appState.eventLog)
+                vm.onSuccess = { [weak appState] in
+                    Task { @MainActor in
+                        appState?.currentUser = try? await appState?.apiService.me()
+                    }
+                    dismiss()
+                }
+                viewModel = vm
+            }
+        }
+    }
+}
+
+private struct LoginContentView: View {
+    @Bindable var viewModel: LoginViewModel
+    let dismiss: DismissAction
 
     var body: some View {
         VStack(spacing: Spacing.lg) {
-            Text(isRegistering ? "Create Account" : "Log In")
+            Text(viewModel.isRegistering ? "Create Account" : "Log In")
                 .font(Typography.pageTitle)
 
-            TextField("Email", text: $email)
+            TextField("Email", text: $viewModel.email)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityLabel("Email address")
 
-            SecureField("Password", text: $password)
+            SecureField("Password", text: $viewModel.password)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityLabel("Password")
                 .accessibilityHint("Minimum 8 characters")
 
-            if let error = errorMessage {
+            if let error = viewModel.errorMessage {
                 Text(error)
                     .foregroundStyle(.red)
                     .font(Typography.meta)
@@ -33,39 +58,20 @@ struct LoginView: View {
                 Button("Cancel") { dismiss() }
                     .buttonStyle(.bordered)
 
-                Button(isRegistering ? "Create Account" : "Log In") {
-                    Task { await submit() }
+                Button(viewModel.isRegistering ? "Create Account" : "Log In") {
+                    Task { await viewModel.submit() }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(email.isEmpty || password.isEmpty || isLoading)
-                .accessibilityLabel(isRegistering ? "Create account" : "Log in")
+                .disabled(!viewModel.canSubmit)
+                .accessibilityLabel(viewModel.isRegistering ? "Create account" : "Log in")
             }
 
-            Button(isRegistering ? "Already have an account? Log in" : "Don't have an account? Create one") {
-                isRegistering.toggle()
-                errorMessage = nil
+            Button(viewModel.isRegistering ? "Already have an account? Log in" : "Don't have an account? Create one") {
+                viewModel.toggleMode()
             }
             .buttonStyle(.plain)
             .font(Typography.meta)
             .accessibilityAddTraits([.isButton, .isLink])
         }
-        .padding()
-        .frame(width: 350)
-    }
-
-    private func submit() async {
-        isLoading = true
-        errorMessage = nil
-        do {
-            if isRegistering {
-                try await appState.register(email: email, password: password)
-            } else {
-                try await appState.login(email: email, password: password)
-            }
-            dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        isLoading = false
     }
 }
