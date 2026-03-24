@@ -101,12 +101,6 @@ private struct UploadContentView: View {
             .accessibilityLabel("Content policy agreement")
             .accessibilityValue(viewModel.acceptedPolicy ? "Agreed" : "Not agreed")
 
-            if let error = viewModel.errorMessage {
-                Text(error)
-                    .foregroundStyle(.red)
-                    .font(Typography.meta)
-            }
-
             if viewModel.isUploading {
                 ProgressView(value: viewModel.uploadProgress)
                 Text("Uploading...")
@@ -135,6 +129,7 @@ private struct UploadContentView: View {
         .padding()
         .frame(width: 400)
         .task { await viewModel.loadCategories() }
+        .errorAlert(message: $viewModel.errorMessage)
     }
 
     private func pickFile() {
