@@ -2,13 +2,83 @@ name: Server CI
 
 on:
   push:
-    paths: ["server/**"]
+    paths: ["server/**", ".github/workflows/server.yml"]
   pull_request:
-    paths: ["server/**"]
+    paths: ["server/**", ".github/workflows/server.yml"]
 
 jobs:
-  test:
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64
+          working-directory: server
+          args: --config .golangci.yml --timeout 5m
+
+  vuln:
+    name: Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: govulncheck
+        working-directory: server
+        run: govulncheck ./...
+
+  generate-verify:
+    name: Verify Generated Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      - name: Install sqlc
+        run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+
+      - name: Install oapi-codegen
+        run: go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+
+      - name: Run generate
+        working-directory: server
+        run: make generate
+
+      - name: Check for diff
+        run: |
+          if ! git diff --quiet; then
+            echo "Generated code is out of date. Run 'make generate' and commit the result."
+            git diff --stat
+            exit 1
+          fi
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: [lint, vuln, generate-verify]
     services:
       postgres:
         image: postgres:16
@@ -22,6 +92,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
       minio:
         image: minio/minio
         env:
@@ -32,19 +103,27 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
-      - name: Run tests with coverage
+          go-version: "1.26"
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      - name: Run tests with race detector
         working-directory: server
         env:
           DATABASE_URL: postgres://test:test@localhost:5432/screenspace_test?sslmode=disable
           S3_ENDPOINT: http://localhost:9000
           S3_ACCESS_KEY: minioadmin
           S3_SECRET_KEY: minioadmin
-          JWT_SECRET: test-secret
+          S3_BUCKET: screenspace-test
+          JWT_SECRET: test-secret-minimum-32-characters-long
+        run: go test -race -coverprofile=coverage.out ./...
+
+      - name: Check coverage threshold
+        working-directory: server
         run: |
-          go test -coverprofile=coverage.out ./... -v -race
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           echo "Coverage: $COVERAGE%"
           if (( $(echo "$COVERAGE < 95" | bc -l) )); then
@@ -52,7 +131,15 @@ jobs:
             exit 1
           fi
 
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: server/coverage.out
+
   docker:
+    name: Docker Build
     needs: test
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -60,11 +147,13 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: docker/build-push-action@v5
         with:
           context: server
