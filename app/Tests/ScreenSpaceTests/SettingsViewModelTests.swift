@@ -7,13 +7,19 @@ struct SettingsViewModelTests {
         let vm: SettingsViewModel
         let store: MockConfigStore
         let cache: MockCache
+        var logoutCalled = false
     }
 
     private func makeVM() -> TestHarness {
         let store = MockConfigStore()
         let cache = MockCache()
-        let vm = SettingsViewModel(configStore: store, cache: cache, eventLog: MockEventLog())
-        return TestHarness(vm: vm, store: store, cache: cache)
+        return TestHarness(vm: SettingsViewModel(
+            configStore: store,
+            cache: cache,
+            eventLog: MockEventLog(),
+            playlistManager: MockPlaylistManager(),
+            onLogout: {}
+        ), store: store, cache: cache)
     }
 
     @Test("initializes from config store")

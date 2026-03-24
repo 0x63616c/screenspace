@@ -7,20 +7,37 @@ final class SettingsViewModel {
     private let configStore: ConfigStoring
     private let cache: CacheProviding
     private let eventLog: EventLogging
+    private let playlistManager: any PlaylistManaging
+    private let onLogout: () -> Void
 
     var config: AppConfig
-    var cacheSize: Int = 0
+    var cacheSize = 0
     var serverURL: String
+    var playlists: [Playlist] = []
     var error: String?
 
-    init(configStore: ConfigStoring, cache: CacheProviding, eventLog: EventLogging) {
+    init(
+        configStore: ConfigStoring,
+        cache: CacheProviding,
+        eventLog: EventLogging,
+        playlistManager: any PlaylistManaging,
+        onLogout: @escaping () -> Void
+    ) {
         self.configStore = configStore
         self.cache = cache
         self.eventLog = eventLog
+        self.playlistManager = playlistManager
+        self.onLogout = onLogout
         let loaded = configStore.load()
-        self.config = loaded
-        self.serverURL = loaded.serverURL
-        self.cacheSize = cache.currentSizeMB()
+        config = loaded
+        serverURL = loaded.serverURL
+        cacheSize = cache.currentSizeMB()
+        playlists = playlistManager.playlists
+    }
+
+    func logout() {
+        onLogout()
+        eventLog.log("logged_out", data: [:])
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {

@@ -13,7 +13,6 @@ struct SettingsView: View {
     @Environment(AppState.self) var appState
     @State private var viewModel: SettingsViewModel?
     @State private var showLogin = false
-    @State private var playlists: [Playlist] = []
 
     var body: some View {
         Group {
@@ -21,8 +20,7 @@ struct SettingsView: View {
                 SettingsContentView(
                     viewModel: viewModel,
                     appState: appState,
-                    showLogin: $showLogin,
-                    playlists: playlists
+                    showLogin: $showLogin
                 )
             } else {
                 ProgressView()
@@ -35,10 +33,13 @@ struct SettingsView: View {
                 viewModel = SettingsViewModel(
                     configStore: appState.configStore,
                     cache: appState.cache,
-                    eventLog: appState.eventLog
+                    eventLog: appState.eventLog,
+                    playlistManager: appState.playlistManager,
+                    onLogout: { [weak appState] in
+                        appState?.logout()
+                    }
                 )
             }
-            playlists = await appState.playlistManager.playlists
         }
     }
 }
@@ -47,7 +48,6 @@ private struct SettingsContentView: View {
     @Bindable var viewModel: SettingsViewModel
     let appState: AppState
     @Binding var showLogin: Bool
-    let playlists: [Playlist]
 
     var body: some View {
         TabView {
@@ -148,7 +148,7 @@ private struct SettingsContentView: View {
                         }
                     )) {
                         Text("None").tag("")
-                        ForEach(playlists) { playlist in
+                        ForEach(viewModel.playlists) { playlist in
                             Text(playlist.name).tag(playlist.id)
                         }
                     }
@@ -165,7 +165,7 @@ private struct SettingsContentView: View {
                 LabeledContent("Email", value: user.email)
                 LabeledContent("Role", value: user.role.rawValue.capitalized)
                 Button("Log Out") {
-                    appState.logout()
+                    viewModel.logout()
                 }
                 .buttonStyle(.bordered)
             } else {
