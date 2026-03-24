@@ -147,7 +147,7 @@ struct UploadView: View {
             uploadProgress = 0.1
             let initResponse = try await appState.api.initiateUpload(
                 title: title,
-                category: category.isEmpty ? nil : category,
+                category: category.isEmpty ? nil : Category(rawValue: category),
                 tags: tags
             )
 

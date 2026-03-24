@@ -33,9 +33,9 @@ final class APIClient: @unchecked Sendable {
     }
 
     // MARK: - Wallpapers
-    func listWallpapers(sort: String = "recent", category: String? = nil, query: String? = nil, limit: Int = 20, offset: Int = 0) async throws -> WallpaperListResponse {
-        var params: [String: String] = ["sort": sort, "limit": "\(limit)", "offset": "\(offset)"]
-        if let category { params["category"] = category }
+    func listWallpapers(sort: SortOrder = .recent, category: Category? = nil, query: String? = nil, limit: Int = 20, offset: Int = 0) async throws -> WallpaperListResponse {
+        var params: [String: String] = ["sort": sort.rawValue, "limit": "\(limit)", "offset": "\(offset)"]
+        if let category { params["category"] = category.rawValue }
         if let query { params["q"] = query }
         return try await get(path: "/api/v1/wallpapers", query: params)
     }
@@ -59,8 +59,8 @@ final class APIClient: @unchecked Sendable {
     }
 
     // MARK: - Upload
-    func initiateUpload(title: String, category: String?, tags: [String]) async throws -> UploadInitResponse {
-        let body: [String: Any] = ["title": title, "category": category as Any, "tags": tags]
+    func initiateUpload(title: String, category: Category?, tags: [String]) async throws -> UploadInitResponse {
+        let body: [String: Any] = ["title": title, "category": category?.rawValue as Any, "tags": tags]
         let data = try JSONSerialization.data(withJSONObject: body)
         return try await postRaw(path: "/api/v1/wallpapers", body: data, authenticated: true)
     }
@@ -99,9 +99,9 @@ final class APIClient: @unchecked Sendable {
         let _: [String: String] = try await post(path: "/api/v1/admin/queue/\(id)/reject", body: body, authenticated: true)
     }
 
-    func listAllWallpapers(status: String? = nil, limit: Int = 20, offset: Int = 0) async throws -> WallpaperListResponse {
+    func listAllWallpapers(status: WallpaperStatus? = nil, limit: Int = 20, offset: Int = 0) async throws -> WallpaperListResponse {
         var params: [String: String] = ["limit": "\(limit)", "offset": "\(offset)"]
-        if let status { params["status"] = status }
+        if let status { params["status"] = status.rawValue }
         return try await get(path: "/api/v1/admin/wallpapers", query: params, authenticated: true)
     }
 

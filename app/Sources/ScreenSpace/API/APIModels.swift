@@ -1,18 +1,18 @@
 import Foundation
 
 // MARK: - Auth
-struct AuthRequest: Codable {
+struct AuthRequest: Codable, Sendable {
     let email: String
     let password: String
 }
 
-struct AuthResponse: Codable {
+struct AuthResponse: Codable, Sendable {
     let token: String
-    let role: String
+    let role: UserRole
 }
 
 // MARK: - Categories
-struct CategoriesResponse: Codable {
+struct CategoriesResponse: Codable, Sendable {
     let categories: [String]
 
     /// Fallback categories used when the API is unavailable.
@@ -20,7 +20,7 @@ struct CategoriesResponse: Codable {
 }
 
 // MARK: - Wallpapers
-struct WallpaperResponse: Codable, Identifiable {
+struct WallpaperResponse: Codable, Identifiable, Sendable {
     let id: String
     let title: String
     let resolution: String
@@ -30,13 +30,13 @@ struct WallpaperResponse: Codable, Identifiable {
     let fileSize: Int64
     let format: String
     let downloadCount: Int64
-    let category: String?
+    let category: Category?
     let tags: [String]?
     let thumbnailURL: String?
     let previewURL: String?
     let downloadURL: String?
     let uploaderEmail: String?
-    let status: String?
+    let status: WallpaperStatus?
     let createdAt: String?
 
     enum CodingKeys: String, CodingKey {
@@ -51,12 +51,12 @@ struct WallpaperResponse: Codable, Identifiable {
     }
 }
 
-struct WallpaperListResponse: Codable {
+struct WallpaperListResponse: Codable, Sendable {
     let wallpapers: [WallpaperResponse]
     let total: Int
 }
 
-struct UploadInitResponse: Codable {
+struct UploadInitResponse: Codable, Sendable {
     let id: String
     let uploadURL: String
 
@@ -67,10 +67,10 @@ struct UploadInitResponse: Codable {
 }
 
 // MARK: - User
-struct UserResponse: Codable, Identifiable {
+struct UserResponse: Codable, Identifiable, Sendable {
     let id: String
     let email: String
-    let role: String
+    let role: UserRole
     let banned: Bool?
     let createdAt: String?
 
@@ -80,18 +80,18 @@ struct UserResponse: Codable, Identifiable {
     }
 }
 
-struct UserListResponse: Codable {
+struct UserListResponse: Codable, Sendable {
     let users: [UserResponse]
     let total: Int
 }
 
 // MARK: - Reports
-struct ReportResponse: Codable, Identifiable {
+struct ReportResponse: Codable, Identifiable, Sendable {
     let id: String
     let wallpaperID: String
     let reporterID: String
     let reason: String
-    let status: String
+    let status: WallpaperStatus
     let createdAt: String?
 
     enum CodingKeys: String, CodingKey {
@@ -102,7 +102,7 @@ struct ReportResponse: Codable, Identifiable {
     }
 }
 
-struct ReportListResponse: Codable {
+struct ReportListResponse: Codable, Sendable {
     let reports: [ReportResponse]
     let total: Int
 }

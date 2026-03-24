@@ -13,7 +13,7 @@ final class AppState {
 
     var currentUser: UserResponse?
     var isLoggedIn: Bool { currentUser != nil }
-    var isAdmin: Bool { currentUser?.role == "admin" }
+    var isAdmin: Bool { currentUser?.role == .admin }
     var currentWallpaperURL: URL?
     var currentWallpaperTitle: String?
 

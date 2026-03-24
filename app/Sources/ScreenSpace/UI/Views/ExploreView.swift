@@ -93,7 +93,8 @@ struct ExploreView: View {
         selectedCategory = category
         isLoading = true
         do {
-            let response = try await appState.api.listWallpapers(category: category)
+            let typed = Category(rawValue: category)
+            let response = try await appState.api.listWallpapers(category: typed)
             results = response.wallpapers.map { $0.toCardData() }
         } catch {
             results = []
