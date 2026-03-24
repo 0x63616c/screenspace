@@ -1,0 +1,12 @@
+pre-commit:
+  parallel: true
+  commands:
+    swift-format:
+      root: app/
+      glob: "*.swift"
+      run: swiftformat --config .swiftformat {staged_files}
+      stage_fixed: true
+    swift-lint:
+      root: app/
+      glob: "*.swift"
+      run: swiftlint lint --strict --config .swiftlint.yml {staged_files}
