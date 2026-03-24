@@ -1,6 +1,4 @@
-import Foundation
 import AppKit
-import Combine
 import IOKit.ps
 
 protocol PowerSourceProvider: Sendable {
@@ -57,16 +55,16 @@ final class SystemLockState: LockStateProvider, @unchecked Sendable {
     deinit { DistributedNotificationCenter.default().removeObserver(self) }
 }
 
+@Observable
 @MainActor
-final class PauseController: ObservableObject {
-    @Published private(set) var shouldPause: Bool = false
+final class PauseController {
+    private(set) var shouldPause: Bool = false
 
     private var config: AppConfig
     private let powerSource: PowerSourceProvider
     private let lockState: LockStateProvider
     private var isSleeping: Bool = false
-    private var cancellables = Set<AnyCancellable>()
-    nonisolated(unsafe) private var timer: Timer?
+    private var observationTask: Task<Void, Never>?
 
     init(
         config: AppConfig,
@@ -76,7 +74,7 @@ final class PauseController: ObservableObject {
         self.config = config
         self.powerSource = powerSource
         self.lockState = lockState
-        observeSystemState()
+        startObserving()
         evaluate()
     }
 
@@ -87,83 +85,107 @@ final class PauseController: ObservableObject {
 
     func evaluate() {
         var pause = false
-
-        if config.pauseOnBattery && powerSource.isOnBattery {
-            pause = true
-        }
-
-        if ProcessInfo.processInfo.isLowPowerModeEnabled {
-            pause = true
-        }
-
-        if lockState.isLocked {
-            pause = true
-        }
-
-        if isSleeping {
-            pause = true
-        }
-
+        if config.pauseOnBattery && powerSource.isOnBattery { pause = true }
+        if ProcessInfo.processInfo.isLowPowerModeEnabled { pause = true }
+        if lockState.isLocked { pause = true }
+        if isSleeping { pause = true }
         shouldPause = pause
     }
 
-    private func observeSystemState() {
-        let workspace = NSWorkspace.shared.notificationCenter
-
-        workspace.publisher(for: NSWorkspace.willSleepNotification)
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                self?.isSleeping = true
-                self?.evaluate()
-            }
-            .store(in: &cancellables)
-
-        workspace.publisher(for: NSWorkspace.didWakeNotification)
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                self?.isSleeping = false
-                self?.evaluate()
-            }
-            .store(in: &cancellables)
-
-        NotificationCenter.default.publisher(for: NSNotification.Name.NSProcessInfoPowerStateDidChange)
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                self?.evaluate()
-            }
-            .store(in: &cancellables)
-
-        DistributedNotificationCenter.default().publisher(
-            for: NSNotification.Name("com.apple.screenIsLocked")
-        )
-        .receive(on: RunLoop.main)
-        .sink { [weak self] _ in
-            self?.evaluate()
-        }
-        .store(in: &cancellables)
-
-        DistributedNotificationCenter.default().publisher(
-            for: NSNotification.Name("com.apple.screenIsUnlocked")
-        )
-        .receive(on: RunLoop.main)
-        .sink { [weak self] _ in
-            // Small delay to let lock state provider update
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                self?.evaluate()
+    private func startObserving() {
+        observationTask = Task { [weak self] in
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await self?.observeSleep() }
+                group.addTask { await self?.observeWake() }
+                group.addTask { await self?.observePowerState() }
+                group.addTask { await self?.observeScreenLocked() }
+                group.addTask { await self?.observeScreenUnlocked() }
+                group.addTask { await self?.observePowerSourcePeriodically() }
             }
         }
-        .store(in: &cancellables)
+    }
 
-        // Periodic check for power source changes (no system notification for this)
-        timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.evaluate()
+    private func observeSleep() async {
+        let notifications = NSWorkspace.shared.notificationCenter.notifications(
+            named: NSWorkspace.willSleepNotification
+        )
+        for await _ in notifications {
+            guard !Task.isCancelled else { return }
+            isSleeping = true
+            evaluate()
+        }
+    }
+
+    private func observeWake() async {
+        let notifications = NSWorkspace.shared.notificationCenter.notifications(
+            named: NSWorkspace.didWakeNotification
+        )
+        for await _ in notifications {
+            guard !Task.isCancelled else { return }
+            isSleeping = false
+            evaluate()
+        }
+    }
+
+    private func observePowerState() async {
+        let notifications = NotificationCenter.default.notifications(
+            named: NSNotification.Name.NSProcessInfoPowerStateDidChange
+        )
+        for await _ in notifications {
+            guard !Task.isCancelled else { return }
+            evaluate()
+        }
+    }
+
+    private func observeScreenLocked() async {
+        // DistributedNotificationCenter does not support notifications(named:) async sequence.
+        // Use addObserver with a Task callback instead.
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DistributedNotificationCenter.default().addObserver(
+                forName: NSNotification.Name("com.apple.screenIsLocked"),
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.evaluate()
+                }
             }
+            continuation.resume()
+        }
+        // Keep task alive until cancelled
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(86400))
+        }
+    }
+
+    private func observeScreenUnlocked() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DistributedNotificationCenter.default().addObserver(
+                forName: NSNotification.Name("com.apple.screenIsUnlocked"),
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(100))
+                    self?.evaluate()
+                }
+            }
+            continuation.resume()
+        }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(86400))
+        }
+    }
+
+    private func observePowerSourcePeriodically() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(30))
+            guard !Task.isCancelled else { return }
+            evaluate()
         }
     }
 
     deinit {
-        let t = timer
-        t?.invalidate()
+        observationTask?.cancel()
     }
 }

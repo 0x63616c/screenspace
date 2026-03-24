@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 @Observable
 @MainActor
@@ -20,8 +19,6 @@ final class AppState {
     /// Called when the now-playing title changes so the menu bar can update.
     var onNowPlayingChanged: ((String?) -> Void)?
 
-    private var cancellables = Set<AnyCancellable>()
-
     init(
         engine: WallpaperEngine? = nil,
         api: APIClient? = nil,
@@ -36,18 +33,24 @@ final class AppState {
         self.engine = engine ?? WallpaperEngine(configManager: cm)
         self.pauseController = PauseController(config: cm.config)
 
-        // Wire PauseController to Engine
-        pauseController.$shouldPause
-            .removeDuplicates()
-            .sink { [weak self] shouldPause in
-                guard let self else { return }
+        // Wire PauseController to Engine via @Observable observation
+        Task { @MainActor [weak self] in
+            while let self {
+                let shouldPause = self.pauseController.shouldPause
                 if shouldPause {
                     self.engine.pauseAll()
                 } else {
                     self.engine.resumeAll()
                 }
+                await withCheckedContinuation { continuation in
+                    withObservationTracking {
+                        _ = self.pauseController.shouldPause
+                    } onChange: {
+                        continuation.resume()
+                    }
+                }
             }
-            .store(in: &cancellables)
+        }
     }
 
     func setWallpaper(url: URL, title: String? = nil) {
@@ -94,8 +97,6 @@ final class AppState {
     func skipToNext() {
         let playlists = playlistManager.playlists
         guard let playlist = playlists.first, !playlist.items.isEmpty else { return }
-        // Simple sequential advancement for now
-        // TODO: Track current index, support shuffle
         if let firstItem = playlist.items.first,
            let path = firstItem.path,
            firstItem.source == .local {

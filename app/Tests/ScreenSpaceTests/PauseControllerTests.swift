@@ -1,90 +1,94 @@
-import XCTest
+import Testing
 @testable import ScreenSpace
 
-final class MockPowerSource: PowerSourceProvider, @unchecked Sendable {
+@MainActor
+final class MockPowerSource: PowerSourceProvider {
     var isOnBattery = false
 }
 
-final class MockLockState: LockStateProvider, @unchecked Sendable {
+@MainActor
+final class MockLockState: LockStateProvider {
     var isLocked = false
 }
 
+@Suite("PauseController")
 @MainActor
-final class PauseControllerTests: XCTestCase {
+struct PauseControllerTests {
     private func makeController(
         config: AppConfig = .default,
         powerSource: MockPowerSource = MockPowerSource(),
         lockState: MockLockState = MockLockState()
-    ) -> (PauseController, MockPowerSource, MockLockState) {
-        let controller = PauseController(
-            config: config,
-            powerSource: powerSource,
-            lockState: lockState
-        )
-        return (controller, powerSource, lockState)
+    ) -> PauseController {
+        PauseController(config: config, powerSource: powerSource, lockState: lockState)
     }
 
-    func testShouldPauseOnBattery() {
+    @Test("pauses when on battery and pauseOnBattery is enabled")
+    func pausesOnBattery() {
         let power = MockPowerSource()
         power.isOnBattery = true
         var config = AppConfig.default
         config.pauseOnBattery = true
-        let (controller, _, _) = makeController(config: config, powerSource: power)
+        let controller = makeController(config: config, powerSource: power)
         controller.evaluate()
-        XCTAssertTrue(controller.shouldPause)
+        #expect(controller.shouldPause)
     }
 
-    func testShouldNotPauseOnAC() {
+    @Test("does not pause on AC power")
+    func doesNotPauseOnAC() {
         let power = MockPowerSource()
         power.isOnBattery = false
         var config = AppConfig.default
         config.pauseOnBattery = true
-        let (controller, _, _) = makeController(config: config, powerSource: power)
+        let controller = makeController(config: config, powerSource: power)
         controller.evaluate()
-        XCTAssertFalse(controller.shouldPause)
+        #expect(!controller.shouldPause)
     }
 
-    func testShouldNotPauseWhenDisabled() {
+    @Test("does not pause when pauseOnBattery is disabled")
+    func disabledPauseOnBattery() {
         let power = MockPowerSource()
         power.isOnBattery = true
         var config = AppConfig.default
         config.pauseOnBattery = false
-        let (controller, _, _) = makeController(config: config, powerSource: power)
+        let controller = makeController(config: config, powerSource: power)
         controller.evaluate()
-        XCTAssertFalse(controller.shouldPause)
+        #expect(!controller.shouldPause)
     }
 
-    func testShouldPauseWhenLocked() {
+    @Test("pauses when screen is locked")
+    func pausesWhenLocked() {
         let lock = MockLockState()
         lock.isLocked = true
-        let (controller, _, _) = makeController(lockState: lock)
+        let controller = makeController(lockState: lock)
         controller.evaluate()
-        XCTAssertTrue(controller.shouldPause)
+        #expect(controller.shouldPause)
     }
 
-    func testMultipleConditions() {
+    @Test("pauses when multiple conditions are true")
+    func multipleConditions() {
         let power = MockPowerSource()
         power.isOnBattery = true
         let lock = MockLockState()
         lock.isLocked = true
         var config = AppConfig.default
         config.pauseOnBattery = true
-        let (controller, _, _) = makeController(config: config, powerSource: power, lockState: lock)
+        let controller = makeController(config: config, powerSource: power, lockState: lock)
         controller.evaluate()
-        XCTAssertTrue(controller.shouldPause)
+        #expect(controller.shouldPause)
     }
 
-    func testConfigUpdate() {
+    @Test("updateConfig re-evaluates pause state")
+    func configUpdate() {
         let power = MockPowerSource()
         power.isOnBattery = true
         var config = AppConfig.default
         config.pauseOnBattery = true
-        let (controller, _, _) = makeController(config: config, powerSource: power)
-        XCTAssertTrue(controller.shouldPause)
+        let controller = makeController(config: config, powerSource: power)
+        #expect(controller.shouldPause)
 
         var newConfig = config
         newConfig.pauseOnBattery = false
         controller.updateConfig(newConfig)
-        XCTAssertFalse(controller.shouldPause)
+        #expect(!controller.shouldPause)
     }
 }
