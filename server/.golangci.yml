@@ -10,9 +10,10 @@ linters:
     # Defaults (re-enabled explicitly)
     - errcheck
     - govet
-    - staticcheck
+    - staticcheck    # includes gosimple (merged in golangci-lint v2)
     - unused
     - ineffassign
+
     # Error handling
     - errorlint       # enforce errors.Is/errors.As (NOT wrapcheck: conflicts with handler adapter pattern)
 
@@ -44,63 +45,65 @@ linters:
     # Import control
     - depguard
 
-linters-settings:
-  cyclop:
-    max-complexity: 15
+  settings:
+    cyclop:
+      max-complexity: 15
 
-  gocyclo:
-    min-complexity: 15
+    gocyclo:
+      min-complexity: 15
 
-  nakedret:
-    max-func-lines: 5
+    nakedret:
+      max-func-lines: 5
 
-  exhaustive:
-    default-signifies-exhaustive: false
+    exhaustive:
+      default-signifies-exhaustive: false
 
-  sloglint:
-    no-mixed-args: true
-    kv-only: true
-    static-msg: true
-    no-global: true
+    sloglint:
+      no-mixed-args: true
+      kv-only: true
+      static-msg: true
+      no-global: "all"
 
-  revive:
+    revive:
+      rules:
+        - name: exported
+        - name: var-naming
+        - name: error-return
+        - name: error-naming
+        - name: if-return
+        - name: increment-decrement
+        - name: range
+        - name: time-naming
+        - name: unexported-return
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: empty-block
+
+    depguard:
+      rules:
+        no-stdlib-log:
+          deny:
+            - pkg: "log"
+              desc: "Use slog instead of the standard log package"
+        no-lib-pq:
+          deny:
+            - pkg: "github.com/lib/pq"
+              desc: "Use pgx/v5 instead of lib/pq"
+        no-database-sql:
+          deny:
+            - pkg: "database/sql"
+              desc: "Use pgx/v5 directly instead of database/sql"
+
+    gosec:
+      excludes:
+        - G115  # integer overflow conversion: too noisy for HTTP status codes
+
+  exclusions:
     rules:
-      - name: exported
-      - name: var-naming
-      - name: error-return
-      - name: error-naming
-      - name: if-return
-      - name: increment-decrement
-      - name: range
-      - name: time-naming
-      - name: unexported-return
-      - name: blank-imports
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: dot-imports
-      - name: empty-block
-
-  depguard:
-    rules:
-      no-stdlib-log:
-        deny:
-          - pkg: "log"
-            desc: "Use slog instead of the standard log package"
-      no-lib-pq:
-        deny:
-          - pkg: "github.com/lib/pq"
-            desc: "Use pgx/v5 instead of lib/pq"
-
-  gosec:
-    excludes:
-      - G115  # integer overflow conversion: too noisy for HTTP status codes
-
-issues:
-  max-issues-per-linter: 0
-  max-same-issues: 0
-  exclude-rules:
-    # Test files: relax some rules
-    - path: "_test\\.go"
-      linters:
-        - gosec
-        - errcheck
+      # Test files: relax some rules
+      - path: "_test\\.go"
+        linters:
+          - gosec
+          - errcheck
