@@ -47,14 +47,14 @@ private struct ExploreContentView: View {
                         .padding(.horizontal)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: Spacing.md) {
                         ForEach(viewModel.categories, id: \.self) { category in
-                            Button(action: { Task { await viewModel.selectCategory(category) } }) {
+                            Button(action: { Task { await viewModel.selectCategory(category) } }, label: {
                                 Text(category.rawValue.capitalized)
                                     .font(Typography.label)
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 80)
                                     .background(.quaternary)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
+                            })
                             .buttonStyle(.plain)
                             .accessibilityLabel("\(category.rawValue.capitalized) category")
                             .accessibilityHint("Browse \(category.rawValue) wallpapers")
@@ -66,9 +66,9 @@ private struct ExploreContentView: View {
                 // Results header with back button
                 if let category = viewModel.selectedCategory {
                     HStack {
-                        Button(action: { viewModel.clearCategory() }) {
+                        Button(action: { viewModel.clearCategory() }, label: {
                             Image(systemName: "chevron.left")
-                        }
+                        })
                         .accessibilityLabel("Back to categories")
                         .accessibilityHint("Clears current category selection")
                         Text(category.rawValue.capitalized)
