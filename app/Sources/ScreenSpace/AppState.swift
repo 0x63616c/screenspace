@@ -46,7 +46,7 @@ final class AppState {
         let kc = keychain ?? LiveKeychain()
         let cs = configStore ?? LiveConfigStore()
         let cm = configManager ?? .shared
-        let apiClient = APIClient(network: LiveNetwork(), keychain: kc)
+        let apiClient = APIClient(keychain: kc)
 
         self.keychain = kc
         self.configStore = cs

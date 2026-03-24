@@ -1,11 +1,12 @@
 import Foundation
+import ScreenSpaceAPI
 
-extension WallpaperResponse {
+extension Components.Schemas.Wallpaper {
     func toCardData() -> WallpaperCardData {
         WallpaperCardData(
             id: id,
             title: title,
-            thumbnailURL: thumbnailURL.flatMap { URL(string: $0) },
+            thumbnailURL: URL(string: thumbnailUrl),
             width: width,
             height: height,
             duration: duration

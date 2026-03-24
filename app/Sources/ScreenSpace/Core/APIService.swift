@@ -1,4 +1,5 @@
 import Foundation
+import ScreenSpaceAPI
 
 final class APIService: APIProviding {
     private let client: APIClient
@@ -11,12 +12,12 @@ final class APIService: APIProviding {
 
     func login(email: String, password: String) async throws -> AuthToken {
         let response = try await client.login(email: email, password: password)
-        return AuthToken(token: response.token, role: response.role)
+        return AuthToken(token: response.token, role: mapUserRole(response.role))
     }
 
     func register(email: String, password: String) async throws -> AuthToken {
         let response = try await client.register(email: email, password: password)
-        return AuthToken(token: response.token, role: response.role)
+        return AuthToken(token: response.token, role: mapUserRole(response.role))
     }
 
     func me() async throws -> UserInfo {
@@ -24,9 +25,9 @@ final class APIService: APIProviding {
         return UserInfo(
             id: response.id,
             email: response.email,
-            role: response.role,
-            banned: response.banned ?? false,
-            createdAt: response.createdAt
+            role: mapUserRole(response.role),
+            banned: false,
+            createdAt: nil
         )
     }
 
@@ -69,8 +70,8 @@ final class APIService: APIProviding {
     }
 
     func listCategories() async throws -> [Category] {
-        let strings = try await client.listCategories()
-        return strings.compactMap { Category(rawValue: $0) }
+        let categories = try await client.listCategories()
+        return categories.compactMap { Category(rawValue: $0.rawValue) }
     }
 
     // MARK: - Favorites
@@ -94,7 +95,7 @@ final class APIService: APIProviding {
 
     func initiateUpload(title: String, category: Category?, tags: [String]) async throws -> UploadTicket {
         let response = try await client.initiateUpload(title: title, category: category, tags: tags)
-        return UploadTicket(id: response.id, uploadURL: response.uploadURL)
+        return UploadTicket(id: response.id, uploadURL: response.uploadUrl)
     }
 
     func finalizeUpload(id: String) async throws {
@@ -128,10 +129,16 @@ final class APIService: APIProviding {
     func listUsers(query: String?, limit: Int, offset: Int) async throws -> PagedUsers {
         let response = try await client.listUsers(query: query, limit: limit, offset: offset)
         return PagedUsers(
-            items: response.items.map {
-                UserInfo(id: $0.id, email: $0.email, role: $0.role, banned: $0.banned ?? false, createdAt: $0.createdAt)
+            items: response.value2.items.map {
+                UserInfo(
+                    id: $0.id,
+                    email: $0.email,
+                    role: mapUserRole($0.role),
+                    banned: $0.banned,
+                    createdAt: ISO8601DateFormatter().string(from: $0.createdAt)
+                )
             },
-            total: response.total,
+            total: response.value1.total,
             limit: limit,
             offset: offset
         )
@@ -152,16 +159,16 @@ final class APIService: APIProviding {
     func listReports(limit: Int, offset: Int) async throws -> PagedReports {
         let response = try await client.listReports(limit: limit, offset: offset)
         return PagedReports(
-            items: response.items.map {
+            items: response.value2.items.map {
                 ReportInfo(
                     id: $0.id,
-                    wallpaperID: $0.wallpaperID,
-                    reporterID: $0.reporterID,
+                    wallpaperID: $0.wallpaperId,
+                    reporterID: $0.reporterId,
                     reason: $0.reason,
-                    createdAt: $0.createdAt
+                    createdAt: ISO8601DateFormatter().string(from: $0.createdAt)
                 )
             },
-            total: response.total,
+            total: response.value1.total,
             limit: limit,
             offset: offset
         )
@@ -173,25 +180,36 @@ final class APIService: APIProviding {
 
     // MARK: - Private Mapping
 
-    private func mapWallpaperList(_ response: WallpaperListResponse, limit: Int, offset: Int) -> PagedWallpapers {
+    private func mapUserRole(_ role: Components.Schemas.UserRole) -> UserRole {
+        switch role {
+        case .user: return .user
+        case .admin: return .admin
+        }
+    }
+
+    private func mapWallpaperList(
+        _ response: Components.Schemas.WallpaperListResponse,
+        limit: Int,
+        offset: Int
+    ) -> PagedWallpapers {
         PagedWallpapers(
-            items: response.items.map { wp in
+            items: response.value2.items.map { wp in
                 WallpaperCardData(
                     id: wp.id,
                     title: wp.title,
-                    thumbnailURL: wp.thumbnailURL.flatMap { URL(string: $0) },
+                    thumbnailURL: URL(string: wp.thumbnailUrl),
                     width: wp.width,
                     height: wp.height,
                     duration: wp.duration
                 )
             },
-            total: response.total,
+            total: response.value1.total,
             limit: limit,
             offset: offset
         )
     }
 
-    private func mapWallpaperDetail(_ wp: WallpaperResponse) -> WallpaperDetail {
+    private func mapWallpaperDetail(_ wp: Components.Schemas.Wallpaper) -> WallpaperDetail {
         WallpaperDetail(
             id: wp.id,
             title: wp.title,
@@ -199,17 +217,26 @@ final class APIService: APIProviding {
             width: wp.width,
             height: wp.height,
             duration: wp.duration,
-            fileSize: wp.fileSize,
+            fileSize: Int64(wp.fileSize),
             format: wp.format,
-            downloadCount: wp.downloadCount,
-            category: wp.category,
-            tags: wp.tags ?? [],
-            thumbnailURL: wp.thumbnailURL.flatMap { URL(string: $0) },
-            previewURL: wp.previewURL.flatMap { URL(string: $0) },
-            downloadURL: wp.downloadURL.flatMap { URL(string: $0) },
-            uploaderEmail: wp.uploaderEmail,
-            status: wp.status,
-            createdAt: wp.createdAt
+            downloadCount: Int64(wp.downloadCount),
+            category: wp.category.flatMap { Category(rawValue: $0) },
+            tags: wp.tags,
+            thumbnailURL: URL(string: wp.thumbnailUrl),
+            previewURL: URL(string: wp.previewUrl),
+            downloadURL: nil,
+            uploaderEmail: nil,
+            status: mapWallpaperStatus(wp.status),
+            createdAt: ISO8601DateFormatter().string(from: wp.createdAt)
         )
+    }
+
+    private func mapWallpaperStatus(_ status: Components.Schemas.WallpaperStatus) -> WallpaperStatus {
+        switch status {
+        case .pending: return .pending
+        case .pendingReview: return .pendingReview
+        case .approved: return .approved
+        case .rejected: return .rejected
+        }
     }
 }
