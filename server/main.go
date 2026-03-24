@@ -9,57 +9,51 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	db "github.com/0x63616c/screenspace/server/db/generated"
-	"github.com/0x63616c/screenspace/server/handler"
-	"github.com/0x63616c/screenspace/server/middleware"
-	"github.com/0x63616c/screenspace/server/service"
+	"github.com/0x63616c/screenspace/server/internal/config"
+	apphandler "github.com/0x63616c/screenspace/server/internal/handler"
+	appmw "github.com/0x63616c/screenspace/server/internal/middleware"
+	"github.com/0x63616c/screenspace/server/internal/service"
+	"github.com/0x63616c/screenspace/server/internal/video"
+	oldservice "github.com/0x63616c/screenspace/server/service"
 	"github.com/0x63616c/screenspace/server/storage"
 )
 
 func main() {
-	cfg, err := LoadConfig()
+	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("config", "error", err)
 		os.Exit(1)
 	}
 
+	// Structured logger.
+	level := slog.LevelInfo
+	if cfg.LogLevel == "debug" {
+		level = slog.LevelDebug
+	}
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})))
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Database pool
-	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	// Database pool.
+	pool, err := openDB(ctx, cfg)
 	if err != nil {
-		slog.Error("database config", "error", err)
-		os.Exit(1)
-	}
-	poolCfg.MaxConns = int32(cfg.DBMaxConns)
-	poolCfg.MinConns = int32(cfg.DBMinConns)
-	poolCfg.MaxConnLifetime = cfg.DBMaxConnLifetime
-	poolCfg.HealthCheckPeriod = cfg.DBHealthCheckPeriod
-
-	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
-	if err != nil {
-		slog.Error("database pool", "error", err)
+		slog.Error("database", "error", err)
 		os.Exit(1)
 	}
 	defer pool.Close()
-
-	if err := pool.Ping(ctx); err != nil {
-		slog.Error("database ping", "error", err)
-		os.Exit(1)
-	}
 
 	if err := RunMigrations(pool); err != nil {
 		slog.Error("migrations", "error", err)
 		os.Exit(1)
 	}
 
-	// Querier
-	q := db.New(pool)
-
-	// S3 Storage
+	// S3 storage.
 	store, err := storage.NewS3Store(cfg.S3Endpoint, cfg.S3Bucket, cfg.S3AccessKey, cfg.S3SecretKey)
 	if err != nil {
 		slog.Error("storage", "error", err)
@@ -69,68 +63,117 @@ func main() {
 		slog.Warn("could not ensure bucket", "error", err)
 	}
 
-	// Services
-	authService := service.NewAuthService(cfg.JWTSecret)
-	videoService := service.NewVideoService()
+	// sqlc querier.
+	q := db.New(pool)
 
-	// Handlers
-	authHandler := handler.NewAuthHandler(q, authService, cfg.AdminEmail)
-	wallpaperHandler := handler.NewWallpaperHandler(q, store, videoService, authService)
-	favoriteHandler := handler.NewFavoriteHandler(q, pool)
-	reportHandler := handler.NewReportHandler(q)
-	adminHandler := handler.NewAdminHandler(q)
+	// Services.
+	authSvc := service.NewAuthService(cfg)
+	videoProber := newVideoProber()
+	wallpaperSvc := service.NewWallpaperService(q, store, videoProber, cfg)
+	favoriteSvc := service.NewFavoriteService(q)
+	reportSvc := service.NewReportService(q, cfg)
 
-	// Middleware
-	authMw := middleware.Auth(authService)
-	uploadLimiter := middleware.NewRateLimiter(cfg.UploadRateLimit)
+	// Middleware.
+	bannedCache := appmw.NewBannedCache()
+	authMw := appmw.Auth(authSvc)
+	bannedMw := appmw.BannedCheck(q, bannedCache)
 
-	// Router (still net/http.ServeMux - chi migration is a later plan)
-	mux := http.NewServeMux()
+	publicLimiter := appmw.NewRateLimiter(cfg.PublicRateLimit, time.Minute)
+	authLimiter := appmw.NewRateLimiter(cfg.AuthRateLimit, time.Minute)
+	userLimiter := appmw.NewRateLimiter(cfg.UserRateLimit, time.Minute)
+	uploadLimiter := appmw.NewRateLimiter(cfg.UploadRateLimit, 24*time.Hour)
+	downloadLimiter := appmw.NewRateLimiter(cfg.DownloadRateLimit, time.Hour)
 
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`))
+	// Handlers.
+	wallpaperH := apphandler.NewWallpaperHandler(q, store, wallpaperSvc, authSvc, cfg)
+	authH := apphandler.NewAuthHandler(q, authSvc, bannedCache, cfg)
+	favoriteH := apphandler.NewFavoriteHandler(favoriteSvc)
+	reportH := apphandler.NewReportHandler(reportSvc)
+	adminH := apphandler.NewAdminHandler(q, store, wallpaperSvc, bannedCache, cfg)
+
+	// Router.
+	r := chi.NewRouter()
+	r.Use(chimw.RequestID)
+	r.Use(chimw.RealIP)
+	r.Use(chimw.Recoverer)
+	r.Use(chimw.CleanPath)
+	r.Use(appmw.SecurityHeaders)
+	r.Use(appmw.MaxBodySize)
+
+	r.Route("/api/v1", func(r chi.Router) {
+		// Public routes.
+		r.Group(func(r chi.Router) {
+			r.Use(publicLimiter.PerIP())
+			r.Get("/health", apphandler.Wrap(wallpaperH.Health))
+			r.Get("/categories", apphandler.Wrap(apphandler.ListCategories))
+			r.Get("/wallpapers", apphandler.Wrap(wallpaperH.List))
+			r.Get("/wallpapers/popular", apphandler.Wrap(wallpaperH.Popular))
+			r.Get("/wallpapers/recent", apphandler.Wrap(wallpaperH.Recent))
+			r.Get("/wallpapers/{id}", apphandler.Wrap(wallpaperH.Get))
+		})
+
+		// Auth endpoints (no JWT required, IP-limited).
+		r.Group(func(r chi.Router) {
+			r.Use(authLimiter.PerIP())
+			r.Post("/auth/register", apphandler.Wrap(authH.Register))
+			r.Post("/auth/login", apphandler.Wrap(authH.Login))
+		})
+
+		// Authenticated routes.
+		r.Group(func(r chi.Router) {
+			r.Use(authMw)
+			r.Use(bannedMw)
+			r.Use(userLimiter.PerUser())
+			r.Get("/auth/me", apphandler.Wrap(authH.Me))
+			r.Post("/wallpapers", apphandler.Wrap(func(w http.ResponseWriter, req *http.Request) error {
+				claims := appmw.ClaimsFromContext(req.Context())
+				if claims != nil && !uploadLimiter.Allow(claims.UserID) {
+					return &apphandler.AppError{Status: http.StatusTooManyRequests, Code: "rate_limited", Message: "upload limit reached"}
+				}
+				return wallpaperH.Create(w, req)
+			}))
+			r.Post("/wallpapers/{id}/finalize", apphandler.Wrap(wallpaperH.Finalize))
+			r.Post("/wallpapers/{id}/download", apphandler.Wrap(func(w http.ResponseWriter, req *http.Request) error {
+				claims := appmw.ClaimsFromContext(req.Context())
+				if claims != nil && !downloadLimiter.Allow(claims.UserID) {
+					return &apphandler.AppError{Status: http.StatusTooManyRequests, Code: "rate_limited", Message: "download limit reached"}
+				}
+				return wallpaperH.Download(w, req)
+			}))
+			r.Post("/wallpapers/{id}/favorite", apphandler.Wrap(favoriteH.Toggle))
+			r.Post("/wallpapers/{id}/report", apphandler.Wrap(reportH.Create))
+		})
+
+		// Admin routes.
+		r.Group(func(r chi.Router) {
+			r.Use(authMw)
+			r.Use(bannedMw)
+			r.Use(appmw.Admin)
+			r.Get("/admin/queue", apphandler.Wrap(adminH.Queue))
+			r.Post("/admin/queue/{id}/approve", apphandler.Wrap(adminH.Approve))
+			r.Post("/admin/queue/{id}/reject", apphandler.Wrap(adminH.Reject))
+			r.Get("/admin/wallpapers", apphandler.Wrap(adminH.ListWallpapers))
+			r.Patch("/admin/wallpapers/{id}", apphandler.Wrap(adminH.EditWallpaper))
+			r.Get("/admin/users", apphandler.Wrap(adminH.ListUsers))
+			r.Post("/admin/users/{id}/ban", apphandler.Wrap(adminH.BanUser))
+			r.Post("/admin/users/{id}/unban", apphandler.Wrap(adminH.UnbanUser))
+			r.Post("/admin/users/{id}/promote", apphandler.Wrap(adminH.PromoteUser))
+			r.Get("/admin/reports", apphandler.Wrap(adminH.ListReports))
+			r.Post("/admin/reports/{id}/dismiss", apphandler.Wrap(adminH.DismissReport))
+		})
 	})
-	mux.HandleFunc("POST /api/v1/auth/register", authHandler.Register)
-	mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
-	mux.HandleFunc("GET /api/v1/categories", handler.ListCategories)
-	mux.HandleFunc("GET /api/v1/wallpapers", wallpaperHandler.List)
-	mux.HandleFunc("GET /api/v1/wallpapers/popular", wallpaperHandler.Popular)
-	mux.HandleFunc("GET /api/v1/wallpapers/recent", wallpaperHandler.Recent)
-	mux.HandleFunc("GET /api/v1/wallpapers/{id}", wallpaperHandler.Get)
 
-	mux.Handle("GET /api/v1/auth/me", authMw(http.HandlerFunc(authHandler.Me)))
-	mux.Handle("POST /api/v1/wallpapers", authMw(uploadLimiter.Middleware(http.HandlerFunc(wallpaperHandler.Create))))
-	mux.Handle("POST /api/v1/wallpapers/{id}/download", authMw(http.HandlerFunc(wallpaperHandler.Download)))
-	mux.Handle("POST /api/v1/wallpapers/{id}/finalize", authMw(http.HandlerFunc(wallpaperHandler.Finalize)))
-	mux.Handle("DELETE /api/v1/wallpapers/{id}", authMw(http.HandlerFunc(wallpaperHandler.Delete)))
-	mux.Handle("POST /api/v1/wallpapers/{id}/favorite", authMw(http.HandlerFunc(favoriteHandler.Toggle)))
-	mux.Handle("GET /api/v1/me/favorites", authMw(http.HandlerFunc(favoriteHandler.List)))
-	mux.Handle("POST /api/v1/wallpapers/{id}/report", authMw(http.HandlerFunc(reportHandler.Create)))
-
-	mux.Handle("GET /api/v1/admin/queue", authMw(middleware.Admin(http.HandlerFunc(adminHandler.Queue))))
-	mux.Handle("POST /api/v1/admin/queue/{id}/approve", authMw(middleware.Admin(http.HandlerFunc(adminHandler.Approve))))
-	mux.Handle("POST /api/v1/admin/queue/{id}/reject", authMw(middleware.Admin(http.HandlerFunc(adminHandler.Reject))))
-	mux.Handle("GET /api/v1/admin/wallpapers", authMw(middleware.Admin(http.HandlerFunc(adminHandler.ListWallpapers))))
-	mux.Handle("PATCH /api/v1/admin/wallpapers/{id}", authMw(middleware.Admin(http.HandlerFunc(adminHandler.EditWallpaper))))
-	mux.Handle("GET /api/v1/admin/users", authMw(middleware.Admin(http.HandlerFunc(adminHandler.ListUsers))))
-	mux.Handle("POST /api/v1/admin/users/{id}/ban", authMw(middleware.Admin(http.HandlerFunc(adminHandler.BanUser))))
-	mux.Handle("POST /api/v1/admin/users/{id}/unban", authMw(middleware.Admin(http.HandlerFunc(adminHandler.UnbanUser))))
-	mux.Handle("POST /api/v1/admin/users/{id}/promote", authMw(middleware.Admin(http.HandlerFunc(adminHandler.PromoteUser))))
-	mux.Handle("GET /api/v1/admin/reports", authMw(middleware.Admin(http.HandlerFunc(adminHandler.ListReports))))
-	mux.Handle("POST /api/v1/admin/reports/{id}/dismiss", authMw(middleware.Admin(http.HandlerFunc(adminHandler.DismissReport))))
-
+	// HTTP server with hardened timeouts.
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
-		Handler:      mux,
+		Handler:      r,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
 
 	go func() {
-		slog.Info("listening", "port", cfg.Port)
+		slog.Info("server listening", "addr", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("server", "error", err)
 			os.Exit(1)
@@ -139,9 +182,65 @@ func main() {
 
 	<-ctx.Done()
 	slog.Info("shutting down", "signal", ctx.Err())
+
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("shutdown", "error", err)
 	}
+	slog.Info("shutdown complete")
+}
+
+func openDB(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
+	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	if err != nil {
+		return nil, err
+	}
+	poolCfg.MaxConns = int32(cfg.DBMaxConns)
+	poolCfg.MinConns = int32(cfg.DBMinConns)
+	poolCfg.MaxConnLifetime = cfg.DBMaxConnLifetime
+	poolCfg.HealthCheckPeriod = cfg.DBHealthCheckPeriod
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, err
+	}
+
+	return pool, nil
+}
+
+// videoProberAdapter wraps the old service.VideoService to implement video.Prober.
+type videoProberAdapter struct {
+	svc *oldservice.VideoService
+}
+
+func newVideoProber() video.Prober {
+	return &videoProberAdapter{svc: oldservice.NewVideoService()}
+}
+
+func (v *videoProberAdapter) Probe(ctx context.Context, path string) (*video.ProbeResult, error) {
+	info, err := v.svc.Probe(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	return &video.ProbeResult{
+		Width:    info.Width,
+		Height:   info.Height,
+		Duration: info.Duration,
+		Size:     info.Size,
+		Format:   info.Format,
+	}, nil
+}
+
+func (v *videoProberAdapter) GenerateThumbnail(ctx context.Context, inputPath, outputPath string) error {
+	return v.svc.GenerateThumbnail(ctx, inputPath, outputPath)
+}
+
+func (v *videoProberAdapter) GeneratePreview(ctx context.Context, inputPath, outputPath string) error {
+	return v.svc.GeneratePreview(ctx, inputPath, outputPath)
 }
