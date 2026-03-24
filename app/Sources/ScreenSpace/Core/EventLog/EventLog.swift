@@ -9,7 +9,11 @@ actor EventLog: EventLogging {
     private let appVersion: String
 
     static let shared: EventLog = {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        else {
+            fatalError("Application Support directory unavailable")
+        }
+        let dir = appSupport
             .appendingPathComponent("ScreenSpace")
             .appendingPathComponent("logs")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

@@ -1,17 +1,17 @@
 import Foundation
 
-struct PlaylistItem: Codable, Identifiable, Equatable, Sendable {
+struct PlaylistItem: Codable, Identifiable, Equatable {
     let id: String
     let source: Source
     var path: String?
 
-    enum Source: String, Codable, Sendable {
+    enum Source: String, Codable {
         case local
         case community
     }
 }
 
-struct Playlist: Codable, Identifiable, Equatable, Sendable {
+struct Playlist: Codable, Identifiable, Equatable {
     let id: String
     var name: String
     var items: [PlaylistItem]
@@ -36,11 +36,20 @@ actor PlaylistManager {
     private(set) var playlists: [Playlist] = []
 
     init(directory: URL? = nil) {
-        let dir = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("ScreenSpace").appendingPathComponent("playlists")
+        let dir: URL
+        if let directory {
+            dir = directory
+        } else {
+            guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+                .first
+            else {
+                fatalError("Application Support directory unavailable")
+            }
+            dir = appSupport.appendingPathComponent("ScreenSpace").appendingPathComponent("playlists")
+        }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        self.playlistsDir = dir
-        self.playlists = Self.loadAll(from: dir)
+        playlistsDir = dir
+        playlists = Self.loadAll(from: dir)
     }
 
     func create(name: String) throws -> Playlist {

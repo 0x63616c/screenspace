@@ -6,10 +6,19 @@ final class CacheManager: Sendable {
     private let cacheDir: URL
 
     init(cacheDir: URL? = nil) {
-        self.cacheDir = cacheDir ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("ScreenSpace")
-            .appendingPathComponent("cache")
-            .appendingPathComponent("community")
+        if let cacheDir {
+            self.cacheDir = cacheDir
+        } else {
+            guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+                .first
+            else {
+                fatalError("Application Support directory unavailable")
+            }
+            self.cacheDir = appSupport
+                .appendingPathComponent("ScreenSpace")
+                .appendingPathComponent("cache")
+                .appendingPathComponent("community")
+        }
         try? FileManager.default.createDirectory(at: self.cacheDir, withIntermediateDirectories: true)
     }
 
@@ -18,7 +27,11 @@ final class CacheManager: Sendable {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
-    func cacheFile(from sourceURL: URL, wallpaperID: String, cacheSizeLimitMB: Int = AppConfig.default.cacheSizeLimitMB) throws -> URL {
+    func cacheFile(
+        from sourceURL: URL,
+        wallpaperID: String,
+        cacheSizeLimitMB: Int = AppConfig.default.cacheSizeLimitMB
+    ) throws -> URL {
         let destURL = cacheDir.appendingPathComponent("\(wallpaperID).mp4")
         if FileManager.default.fileExists(atPath: destURL.path) {
             try FileManager.default.removeItem(at: destURL)
@@ -29,7 +42,10 @@ final class CacheManager: Sendable {
     }
 
     func currentCacheSizeMB() -> Int {
-        guard let files = try? FileManager.default.contentsOfDirectory(at: cacheDir, includingPropertiesForKeys: [.fileSizeKey]) else {
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: cacheDir,
+            includingPropertiesForKeys: [.fileSizeKey]
+        ) else {
             return 0
         }
         let totalBytes = files.compactMap { url -> Int? in
@@ -48,8 +64,10 @@ final class CacheManager: Sendable {
         ) else { return }
 
         let sorted = files.sorted { a, b in
-            let dateA = (try? a.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-            let dateB = (try? b.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let dateA = (try? a.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ??
+                .distantPast
+            let dateB = (try? b.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ??
+                .distantPast
             return dateA < dateB
         }
 

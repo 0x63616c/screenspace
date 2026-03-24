@@ -5,8 +5,12 @@ struct LiveConfigStore: ConfigStoring {
 
     init(configURL: URL? = nil) {
         self.configURL = configURL ?? {
-            let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-                .appendingPathComponent("ScreenSpace")
+            guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+                .first
+            else {
+                fatalError("Application Support directory unavailable")
+            }
+            let dir = appSupport.appendingPathComponent("ScreenSpace")
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             return dir.appendingPathComponent("config.json")
         }()

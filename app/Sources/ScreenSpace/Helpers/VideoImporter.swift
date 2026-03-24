@@ -6,7 +6,8 @@ enum VideoImporter {
     static let supportedExtensions = Set(["mp4", "mov"])
 
     static func isValidVideo(url: URL) -> Bool {
-        supportedExtensions.contains(url.pathExtension.lowercased()) && FileManager.default.isReadableFile(atPath: url.path)
+        supportedExtensions.contains(url.pathExtension.lowercased()) && FileManager.default
+            .isReadableFile(atPath: url.path)
     }
 
     static func importVideo(from sourceURL: URL, to libraryDir: URL) throws -> URL {
@@ -18,7 +19,11 @@ enum VideoImporter {
     }
 
     static func libraryDirectory() -> URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        else {
+            fatalError("Application Support directory unavailable")
+        }
+        return appSupport
             .appendingPathComponent("ScreenSpace")
             .appendingPathComponent("Library")
     }
