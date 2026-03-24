@@ -12,11 +12,11 @@ import (
 	_ "github.com/lib/pq"
 )
 
-//go:embed migrations/*.sql
+//go:embed db/migrations/*.sql
 var migrationsFS embed.FS
 
 func RunMigrations(db *sql.DB) error {
-	source, err := iofs.New(migrationsFS, "migrations")
+	source, err := iofs.New(migrationsFS, "db/migrations")
 	if err != nil {
 		return fmt.Errorf("migration source: %w", err)
 	}
