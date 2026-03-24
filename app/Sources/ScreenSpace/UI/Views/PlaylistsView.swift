@@ -2,9 +2,31 @@ import SwiftUI
 
 struct PlaylistsView: View {
     @Environment(AppState.self) var appState
-    @State private var playlists: [Playlist] = []
-    @State private var newPlaylistName = ""
-    @State private var selectedPlaylist: Playlist?
+    @State private var viewModel: PlaylistsViewModel?
+
+    var body: some View {
+        Group {
+            if let viewModel {
+                PlaylistsContentView(viewModel: viewModel)
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            if viewModel == nil {
+                let vm = PlaylistsViewModel(
+                    playlistManager: appState.playlistManager,
+                    eventLog: appState.eventLog
+                )
+                vm.load()
+                viewModel = vm
+            }
+        }
+    }
+}
+
+private struct PlaylistsContentView: View {
+    @Bindable var viewModel: PlaylistsViewModel
 
     var body: some View {
         ScrollView {
@@ -13,35 +35,28 @@ struct PlaylistsView: View {
                     .font(Typography.pageTitle)
                     .padding(.horizontal)
 
-                // Create new playlist
                 HStack {
-                    TextField("New playlist name", text: $newPlaylistName)
+                    TextField("New playlist name", text: $viewModel.newPlaylistName)
                         .textFieldStyle(.roundedBorder)
                         .accessibilityLabel("New playlist name")
                     Button("Create") {
-                        guard !newPlaylistName.isEmpty else { return }
-                        Task {
-                            if let playlist = try? await appState.playlistManager.create(name: newPlaylistName) {
-                                playlists.append(playlist)
-                                newPlaylistName = ""
-                            }
-                        }
+                        viewModel.create()
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(newPlaylistName.isEmpty)
+                    .disabled(viewModel.newPlaylistName.isEmpty)
                     .accessibilityLabel("Create playlist")
                     .accessibilityHint("Creates a new playlist with the entered name")
                 }
                 .padding(.horizontal)
 
-                if playlists.isEmpty {
+                if viewModel.playlists.isEmpty {
                     EmptyStateView(
                         icon: "music.note.list",
                         title: "No playlists yet",
                         subtitle: "Create a playlist to rotate wallpapers automatically."
                     )
                 } else {
-                    ForEach(playlists) { playlist in
+                    ForEach(viewModel.playlists) { playlist in
                         playlistCard(playlist)
                     }
                     .padding(.horizontal)
@@ -49,7 +64,10 @@ struct PlaylistsView: View {
             }
             .padding(.vertical)
         }
-        .task { playlists = await appState.playlistManager.playlists }
+        .errorAlert(message: Binding(
+            get: { viewModel.error },
+            set: { viewModel.error = $0 }
+        ))
     }
 
     private func playlistCard(_ playlist: Playlist) -> some View {
@@ -73,12 +91,7 @@ struct PlaylistsView: View {
                 Toggle("Shuffle", isOn: Binding(
                     get: { playlist.shuffle },
                     set: { newValue in
-                        var updated = playlist
-                        updated.shuffle = newValue
-                        Task {
-                            try? await appState.playlistManager.update(updated)
-                            playlists = await appState.playlistManager.playlists
-                        }
+                        viewModel.updateShuffle(playlist, enabled: newValue)
                     }
                 ))
                 .toggleStyle(.switch)
@@ -87,10 +100,7 @@ struct PlaylistsView: View {
                 .accessibilityValue(playlist.shuffle ? "On" : "Off")
 
                 Button(action: {
-                    Task {
-                        try? await appState.playlistManager.delete(id: playlist.id)
-                        playlists = await appState.playlistManager.playlists
-                    }
+                    viewModel.delete(playlist: playlist)
                 }, label: {
                     Image(systemName: "trash")
                 })
