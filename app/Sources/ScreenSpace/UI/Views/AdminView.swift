@@ -22,14 +22,14 @@ struct AdminView: View {
             // Tab bar
             HStack(spacing: 0) {
                 ForEach(AdminTab.allCases, id: \.self) { tab in
-                    Button(action: { selectedTab = tab }) {
+                    Button(action: { selectedTab = tab }, label: {
                         Text(tab.rawValue)
                             .font(.subheadline)
                             .fontWeight(selectedTab == tab ? .semibold : .regular)
                             .foregroundStyle(selectedTab == tab ? .primary : .secondary)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
-                    }
+                    })
                     .buttonStyle(.plain)
                     .background {
                         if selectedTab == tab {
@@ -95,7 +95,7 @@ struct AdminView: View {
             HStack {
                 VStack(alignment: .leading) {
                     Text(user.email)
-                    Text(user.role)
+                    Text(user.role.rawValue)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

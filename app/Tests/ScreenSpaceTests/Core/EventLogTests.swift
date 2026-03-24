@@ -1,8 +1,7 @@
-import Testing
 import Foundation
+import Testing
 @testable import ScreenSpace
 
-@Suite("EventLog")
 @MainActor
 struct EventLogTests {
     @Test("log writes JSONL entry with required fields")
@@ -24,7 +23,10 @@ struct EventLogTests {
         let logURL = dir.appendingPathComponent("events.jsonl")
         let data = try Data(contentsOf: logURL)
         let line = String(data: data, encoding: .utf8) ?? ""
-        let json = try JSONSerialization.jsonObject(with: Data(line.utf8)) as! [String: Any]
+        guard let json = try JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else {
+            Issue.record("Failed to parse JSON line")
+            return
+        }
 
         #expect(json["ts"] != nil)
         #expect(json["sid"] as? String == "test-session")

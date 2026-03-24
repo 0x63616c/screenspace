@@ -2,16 +2,15 @@ import Testing
 @testable import ScreenSpace
 
 @MainActor
-final class MockPowerSource: PowerSourceProvider {
+final class MockPowerSource: @preconcurrency PowerSourceProvider {
     var isOnBattery = false
 }
 
 @MainActor
-final class MockLockState: LockStateProvider {
+final class MockLockState: @preconcurrency LockStateProvider {
     var isLocked = false
 }
 
-@Suite("PauseController")
 @MainActor
 struct PauseControllerTests {
     private func makeController(

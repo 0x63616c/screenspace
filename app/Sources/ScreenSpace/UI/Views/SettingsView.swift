@@ -1,10 +1,9 @@
-import SwiftUI
 import ServiceManagement
+import SwiftUI
 
 private extension View {
     func settingsTabStyle() -> some View {
-        self
-            .formStyle(.grouped)
+        formStyle(.grouped)
             .scrollContentBackground(.hidden)
             .frame(maxHeight: .infinity, alignment: .top)
     }
@@ -73,17 +72,23 @@ struct SettingsView: View {
         Form {
             Toggle("Pause on battery", isOn: Binding(
                 get: { config.pauseOnBattery },
-                set: { config.pauseOnBattery = $0; saveConfig() }
+                set: { config.pauseOnBattery = $0
+                    saveConfig()
+                }
             ))
 
             Toggle("Pause when fullscreen app active", isOn: Binding(
                 get: { config.pauseOnFullscreen },
-                set: { config.pauseOnFullscreen = $0; saveConfig() }
+                set: { config.pauseOnFullscreen = $0
+                    saveConfig()
+                }
             ))
 
             Picker("Video scaling", selection: Binding(
                 get: { config.videoGravity },
-                set: { config.videoGravity = $0; saveConfig() }
+                set: { config.videoGravity = $0
+                    saveConfig()
+                }
             )) {
                 Text("Fill (crop edges)").tag(VideoGravityOption.resizeAspectFill)
                 Text("Fit (letterbox)").tag(VideoGravityOption.resizeAspect)
@@ -103,8 +108,10 @@ struct SettingsView: View {
 
             Stepper("Cache limit: \(formatSize(config.cacheSizeLimitMB))", value: Binding(
                 get: { config.cacheSizeLimitMB },
-                set: { config.cacheSizeLimitMB = $0; saveConfig() }
-            ), in: 1024...20480, step: 1024)
+                set: { config.cacheSizeLimitMB = $0
+                    saveConfig()
+                }
+            ), in: 1024 ... 20480, step: 1024)
 
             Button("Clear Cache") {
                 try? CacheManager.shared.clearCache()
@@ -171,7 +178,8 @@ struct SettingsView: View {
     }
 
     private func saveConfig() {
-        Task { try? await appState.configManager.update { $0 = config } }
+        let snapshot = config
+        Task { try? await appState.configManager.setConfig(snapshot) }
     }
 
     private func formatSize(_ mb: Int) -> String {

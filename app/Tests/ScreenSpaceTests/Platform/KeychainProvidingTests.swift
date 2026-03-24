@@ -1,7 +1,7 @@
+import Foundation
 import Testing
 @testable import ScreenSpace
 
-@Suite("MockKeychain")
 @MainActor
 struct KeychainProvidingTests {
     @Test("saves and loads data by key")

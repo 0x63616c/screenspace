@@ -12,7 +12,8 @@ protocol LockStateProvider: AnyObject, Sendable {
 struct SystemPowerSource: PowerSourceProvider {
     var isOnBattery: Bool {
         guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-              let source = IOPSGetProvidingPowerSourceType(snapshot)?.takeRetainedValue() as? String else {
+              let source = IOPSGetProvidingPowerSourceType(snapshot)?.takeRetainedValue() as? String
+        else {
             return false
         }
         return source == kIOPSBatteryPowerValue as String
@@ -58,13 +59,13 @@ final class SystemLockState: LockStateProvider, @unchecked Sendable {
 @Observable
 @MainActor
 final class PauseController {
-    private(set) var shouldPause: Bool = false
+    private(set) var shouldPause = false
 
     private var config: AppConfig
     private let powerSource: PowerSourceProvider
     private let lockState: LockStateProvider
-    private var isSleeping: Bool = false
-    private var observationTask: Task<Void, Never>?
+    private var isSleeping = false
+    private nonisolated(unsafe) var observationTask: Task<Void, Never>?
 
     init(
         config: AppConfig,
@@ -85,7 +86,7 @@ final class PauseController {
 
     func evaluate() {
         var pause = false
-        if config.pauseOnBattery && powerSource.isOnBattery { pause = true }
+        if config.pauseOnBattery, powerSource.isOnBattery { pause = true }
         if ProcessInfo.processInfo.isLowPowerModeEnabled { pause = true }
         if lockState.isLocked { pause = true }
         if isSleeping { pause = true }
@@ -93,15 +94,15 @@ final class PauseController {
     }
 
     private func startObserving() {
-        observationTask = Task { [weak self] in
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask { await self?.observeSleep() }
-                group.addTask { await self?.observeWake() }
-                group.addTask { await self?.observePowerState() }
-                group.addTask { await self?.observeScreenLocked() }
-                group.addTask { await self?.observeScreenUnlocked() }
-                group.addTask { await self?.observePowerSourcePeriodically() }
-            }
+        observationTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            async let s1: Void = self.observeSleep()
+            async let s2: Void = self.observeWake()
+            async let s3: Void = self.observePowerState()
+            async let s4: Void = self.observeScreenLocked()
+            async let s5: Void = self.observeScreenUnlocked()
+            async let s6: Void = self.observePowerSourcePeriodically()
+            _ = await (s1, s2, s3, s4, s5, s6)
         }
     }
 

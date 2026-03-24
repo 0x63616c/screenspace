@@ -11,8 +11,8 @@ actor ConfigManager {
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("ScreenSpace")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        self.configURL = dir.appendingPathComponent("config.json")
-        self.config = Self.load(from: configURL) ?? .default
+        configURL = dir.appendingPathComponent("config.json")
+        config = Self.load(from: configURL) ?? .default
     }
 
     private static func load(from url: URL) -> AppConfig? {
@@ -31,8 +31,13 @@ actor ConfigManager {
         try data.write(to: configURL, options: .atomic)
     }
 
-    func update(_ transform: (inout AppConfig) -> Void) throws {
+    func update(_ transform: @Sendable (inout AppConfig) -> Void) throws {
         transform(&config)
+        try save()
+    }
+
+    func setConfig(_ newConfig: AppConfig) throws {
+        config = newConfig
         try save()
     }
 }

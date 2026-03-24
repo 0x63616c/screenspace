@@ -16,14 +16,15 @@ struct DetailView: View {
             VStack(alignment: .leading, spacing: Spacing.lg) {
                 // Video preview area
                 if let previewURLString = wallpaper.previewURL,
-                   let previewURL = URL(string: previewURLString) {
+                   let previewURL = URL(string: previewURLString)
+                {
                     VideoPreview(url: previewURL)
-                        .aspectRatio(16/9, contentMode: .fit)
+                        .aspectRatio(16 / 9, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.black)
-                        .aspectRatio(16/9, contentMode: .fit)
+                        .aspectRatio(16 / 9, contentMode: .fit)
                         .overlay {
                             Image(systemName: "play.circle.fill")
                                 .font(.system(size: 48))
@@ -39,7 +40,7 @@ struct DetailView: View {
                             .fontWeight(.bold)
 
                         if let category = wallpaper.category {
-                            Text(category.capitalized)
+                            Text(category.rawValue.capitalized)
                                 .font(.caption)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
@@ -96,18 +97,18 @@ struct DetailView: View {
                                 Task {
                                     isFavorited = try await appState.api.toggleFavorite(id: wallpaper.id)
                                 }
-                            }) {
+                            }, label: {
                                 Image(systemName: isFavorited ? "heart.fill" : "heart")
-                            }
+                            })
                             .buttonStyle(.bordered)
                             .controlSize(.regular)
 
                             Button(action: {
                                 guard appState.isLoggedIn else { return }
                                 showReportSheet = true
-                            }) {
+                            }, label: {
                                 Image(systemName: "flag")
-                            }
+                            })
                             .buttonStyle(.bordered)
                             .controlSize(.regular)
                         }
@@ -236,7 +237,7 @@ struct VideoPreview: NSViewRepresentable {
     }
 }
 
-// Simple flow layout for tags
+/// Simple flow layout for tags
 struct FlowLayout: Layout {
     var spacing: CGFloat = 4
 
@@ -248,7 +249,10 @@ struct FlowLayout: Layout {
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         let result = arrange(proposal: proposal, subviews: subviews)
         for (index, position) in result.positions.enumerated() {
-            subviews[index].place(at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y), proposal: .unspecified)
+            subviews[index].place(
+                at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y),
+                proposal: .unspecified
+            )
         }
     }
 
@@ -262,7 +266,7 @@ struct FlowLayout: Layout {
 
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
-            if x + size.width > maxWidth && x > 0 {
+            if x + size.width > maxWidth, x > 0 {
                 x = 0
                 y += rowHeight + spacing
                 rowHeight = 0
