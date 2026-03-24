@@ -10,7 +10,8 @@ protocol APIProviding: Sendable {
     // Wallpapers
     func popularWallpapers(limit: Int, offset: Int) async throws -> PagedWallpapers
     func recentWallpapers(limit: Int, offset: Int) async throws -> PagedWallpapers
-    func listWallpapers(category: Category?, query: String?, sort: SortOrder, limit: Int, offset: Int) async throws -> PagedWallpapers
+    func listWallpapers(category: Category?, query: String?, sort: SortOrder, limit: Int, offset: Int) async throws
+        -> PagedWallpapers
     func getWallpaper(id: String) async throws -> WallpaperDetail
     func listCategories() async throws -> [Category]
 
@@ -18,7 +19,7 @@ protocol APIProviding: Sendable {
     func toggleFavorite(id: String) async throws -> Bool
     func listFavorites(limit: Int, offset: Int) async throws -> PagedWallpapers
 
-    // Reports
+    /// Reports
     func reportWallpaper(id: String, reason: String) async throws
 
     // Upload
@@ -42,7 +43,7 @@ protocol APIProviding: Sendable {
 enum APIError: Error, LocalizedError {
     case notFound
     case forbidden
-    case httpError(status: Int)
+    case httpError(status: Int, message: String? = nil)
     case invalidURL
     case invalidResponse
 
@@ -50,7 +51,9 @@ enum APIError: Error, LocalizedError {
         switch self {
         case .notFound: return "Not found"
         case .forbidden: return "Forbidden"
-        case .httpError(let status): return "Server error (\(status))"
+        case let .httpError(status, message):
+            if let message { return "HTTP \(status): \(message)" }
+            return "Server error (\(status))"
         case .invalidURL: return "Invalid URL"
         case .invalidResponse: return "Invalid response"
         }

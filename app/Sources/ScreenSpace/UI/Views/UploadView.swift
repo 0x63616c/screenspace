@@ -177,7 +177,7 @@ struct UploadView: View {
             guard let httpResponse = response as? HTTPURLResponse,
                   (200 ..< 300).contains(httpResponse.statusCode)
             else {
-                throw APIClient.APIError.httpError(statusCode: 0, message: "Upload to storage failed")
+                throw APIError.httpError(status: 0, message: "Upload to storage failed")
             }
 
             // Step 3: Finalize
