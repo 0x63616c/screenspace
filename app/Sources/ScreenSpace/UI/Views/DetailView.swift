@@ -29,6 +29,7 @@ struct DetailView: View {
 }
 
 private struct DetailContentView: View {
+    @Environment(\.dismiss) private var dismiss
     @Bindable var viewModel: DetailViewModel
     let appState: AppState
 
@@ -84,7 +85,7 @@ private struct DetailContentView: View {
                             }
                         }
 
-                        HStack(spacing: Spacing.md) {
+                        HStack(spacing: Spacing.sm) {
                             Button(action: { Task { await viewModel.setAsWallpaper() } }) {
                                 Label("Set as Wallpaper", systemImage: "photo.on.rectangle")
                             }
@@ -107,6 +108,8 @@ private struct DetailContentView: View {
                                     .accessibilityLabel("Downloading wallpaper")
                                     .accessibilityValue("\(Int(viewModel.downloadProgress * 100))%")
                             }
+
+                            Spacer()
 
                             Button(action: {
                                 Task { await viewModel.toggleFavorite(isLoggedIn: appState.isLoggedIn) }
@@ -156,6 +159,12 @@ private struct DetailContentView: View {
             }
             .padding()
             .frame(width: 350)
+        }
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Close") { dismiss() }
+                    .keyboardShortcut(.escape, modifiers: [])
+            }
         }
         .errorAlert(message: Binding(
             get: { viewModel.error },

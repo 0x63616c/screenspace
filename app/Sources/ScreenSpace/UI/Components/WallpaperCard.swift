@@ -11,33 +11,28 @@ struct WallpaperCard: View {
         Button(action: { onTap?() }) {
             VStack(alignment: .leading, spacing: Spacing.sm) {
                 ZStack(alignment: .topTrailing) {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.gray.opacity(0.2),
-                                    Color.gray.opacity(0.1)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .aspectRatio(16 / 9, contentMode: .fit)
-                        .overlay {
-                            if let url = data.thumbnailURL {
-                                AsyncImage(url: url) { image in
-                                    image.resizable().scaledToFill()
-                                } placeholder: {
-                                    ProgressView()
-                                        .scaleEffect(0.5)
-                                }
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                            } else {
+                    if let url = data.thumbnailURL {
+                        AsyncImage(url: url) { image in
+                            image.resizable().scaledToFill()
+                        } placeholder: {
+                            ProgressView()
+                                .scaleEffect(0.5)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(Color.gray.opacity(0.15))
+                        }
+                        .frame(width: 200, height: 200 * 9 / 16)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    } else {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.gray.opacity(0.15))
+                            .aspectRatio(16 / 9, contentMode: .fit)
+                            .overlay {
                                 Image(systemName: "play.circle.fill")
                                     .font(.title2)
                                     .foregroundStyle(.white.opacity(0.3))
                             }
-                        }
+                    }
 
                     ResolutionBadge(width: data.width, height: data.height)
                         .padding(Spacing.sm)
