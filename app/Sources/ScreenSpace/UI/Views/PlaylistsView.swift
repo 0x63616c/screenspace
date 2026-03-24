@@ -10,13 +10,14 @@ struct PlaylistsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.lg) {
                 Text("Playlists")
-                    .font(.title2).fontWeight(.bold)
+                    .font(Typography.pageTitle)
                     .padding(.horizontal)
 
                 // Create new playlist
                 HStack {
                     TextField("New playlist name", text: $newPlaylistName)
                         .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("New playlist name")
                     Button("Create") {
                         guard !newPlaylistName.isEmpty else { return }
                         Task {
@@ -28,6 +29,8 @@ struct PlaylistsView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(newPlaylistName.isEmpty)
+                    .accessibilityLabel("Create playlist")
+                    .accessibilityHint("Creates a new playlist with the entered name")
                 }
                 .padding(.horizontal)
 
@@ -54,16 +57,16 @@ struct PlaylistsView: View {
             HStack {
                 VStack(alignment: .leading) {
                     Text(playlist.name)
-                        .font(.headline)
+                        .font(Typography.label)
                     Text("\(playlist.items.count) items")
-                        .font(.caption)
+                        .font(Typography.meta)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
 
                 if playlist.interval > 0 {
                     Text("Every \(playlist.interval / 60)min")
-                        .font(.caption)
+                        .font(Typography.meta)
                         .foregroundStyle(.secondary)
                 }
 
@@ -80,6 +83,8 @@ struct PlaylistsView: View {
                 ))
                 .toggleStyle(.switch)
                 .labelsHidden()
+                .accessibilityLabel("Shuffle \(playlist.name)")
+                .accessibilityValue(playlist.shuffle ? "On" : "Off")
 
                 Button(role: .destructive) {
                     Task {
@@ -90,6 +95,9 @@ struct PlaylistsView: View {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.bordered)
+                .tint(.red)
+                .accessibilityLabel("Delete \(playlist.name)")
+                .accessibilityHint("Permanently removes this playlist")
             }
         }
         .padding()

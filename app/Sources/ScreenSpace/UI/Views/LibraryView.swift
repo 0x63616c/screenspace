@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct LibraryView: View {
     @Environment(AppState.self) var appState
@@ -11,8 +10,7 @@ struct LibraryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.lg) {
                 Text("Your Library")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(Typography.pageTitle)
                     .padding(.horizontal)
 
                 if localVideos.isEmpty {
@@ -47,15 +45,17 @@ struct LibraryView: View {
             Image(systemName: "arrow.down.doc")
                 .font(.title)
             Text("Drop MP4 or MOV files here")
-                .font(.caption)
+                .font(Typography.meta)
         }
         .foregroundStyle(isDragOver ? .blue : .secondary)
         .frame(maxWidth: .infinity)
         .frame(height: 120)
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
-        .onDrop(of: [.fileURL], isTargeted: $isDragOver) { providers in
-            handleDrop(providers)
+        .dropDestination(for: URL.self) { urls, _ in
+            handleDroppedURLs(urls)
             return true
+        } isTargeted: { targeted in
+            isDragOver = targeted
         }
         .padding(.horizontal)
         .accessibilityLabel("Drop zone for video files. Drop MP4 or MOV files here to add to your library.")
@@ -66,7 +66,7 @@ struct LibraryView: View {
             LocalVideoThumbnail(url: url)
 
             Text(url.lastPathComponent)
-                .font(.caption)
+                .font(Typography.meta)
                 .lineLimit(1)
 
             Button("Set as Wallpaper") {
@@ -74,6 +74,8 @@ struct LibraryView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
+            .accessibilityLabel("Set \(url.lastPathComponent) as wallpaper")
+            .accessibilityHint("Plays this video as your desktop wallpaper")
         }
         .frame(width: 200)
         .contextMenu {
@@ -90,22 +92,14 @@ struct LibraryView: View {
         localVideos = VideoImporter.listLocalVideos()
     }
 
-    private func handleDrop(_ providers: [NSItemProvider]) {
-        for provider in providers {
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                guard let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-                guard VideoImporter.isValidVideo(url: url) else { return }
-                do {
-                    let imported = try VideoImporter.importVideo(from: url, to: VideoImporter.libraryDirectory())
-                    Task { @MainActor in
-                        localVideos.append(imported)
-                    }
-                } catch {
-                    let message = "Failed to import \(url.lastPathComponent): \(error.localizedDescription)"
-                    Task { @MainActor in
-                        importError = message
-                    }
-                }
+    private func handleDroppedURLs(_ urls: [URL]) {
+        for url in urls {
+            guard VideoImporter.isValidVideo(url: url) else { continue }
+            do {
+                let imported = try VideoImporter.importVideo(from: url, to: VideoImporter.libraryDirectory())
+                localVideos.append(imported)
+            } catch {
+                importError = "Failed to import \(url.lastPathComponent): \(error.localizedDescription)"
             }
         }
     }
@@ -130,7 +124,7 @@ private struct LocalVideoThumbnail: View {
             } else {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.gray.opacity(0.3))
-                    .aspectRatio(16/9, contentMode: .fit)
+                    .aspectRatio(16 / 9, contentMode: .fit)
                     .overlay {
                         Image(systemName: "play.circle")
                             .font(.title)

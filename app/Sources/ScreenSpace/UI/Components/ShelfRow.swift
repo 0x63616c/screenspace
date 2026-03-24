@@ -10,14 +10,13 @@ struct ShelfRow: View {
         VStack(alignment: .leading, spacing: Spacing.md) {
             HStack {
                 Text(title)
-                    .font(.title3)
-                    .fontWeight(.bold)
+                    .font(Typography.sectionTitle)
 
                 Spacer()
 
                 Button("See All") { onSeeAll?() }
                     .buttonStyle(.plain)
-                    .font(.subheadline)
+                    .font(Typography.cardTitle)
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, Spacing.xl)

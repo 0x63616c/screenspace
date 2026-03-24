@@ -14,8 +14,7 @@ struct AdminView: View {
     @State private var reports: [ReportResponse] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
-
-    private let api = APIClient()
+    @Environment(AppState.self) private var appState
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,13 +23,16 @@ struct AdminView: View {
                 ForEach(AdminTab.allCases, id: \.self) { tab in
                     Button(action: { selectedTab = tab }, label: {
                         Text(tab.rawValue)
-                            .font(.subheadline)
+                            .font(Typography.cardTitle)
                             .fontWeight(selectedTab == tab ? .semibold : .regular)
                             .foregroundStyle(selectedTab == tab ? .primary : .secondary)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                     })
                     .buttonStyle(.plain)
+                    .accessibilityLabel("\(tab.rawValue) tab")
+                    .accessibilityValue(selectedTab == tab ? "Selected" : "")
+                    .accessibilityAddTraits(selectedTab == tab ? [.isButton, .isSelected] : .isButton)
                     .background {
                         if selectedTab == tab {
                             Capsule()
@@ -44,7 +46,7 @@ struct AdminView: View {
             if let error = errorMessage {
                 Text(error)
                     .foregroundStyle(.red)
-                    .font(.caption)
+                    .font(Typography.meta)
                     .padding(.horizontal)
             }
 
@@ -64,16 +66,19 @@ struct AdminView: View {
                 VStack(alignment: .leading) {
                     Text(wp.title).fontWeight(.medium)
                     Text("\(wp.resolution) - \(wp.format)")
-                        .font(.caption)
+                        .font(Typography.meta)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("Approve") { Task { await approve(wp.id) } }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
+                    .accessibilityLabel("Approve \(wp.title)")
                 Button("Reject") { Task { await reject(wp.id) } }
                     .buttonStyle(.bordered)
+                    .tint(.red)
                     .controlSize(.small)
+                    .accessibilityLabel("Reject \(wp.title)")
             }
         }
         .overlay {
@@ -96,7 +101,7 @@ struct AdminView: View {
                 VStack(alignment: .leading) {
                     Text(user.email)
                     Text(user.role.rawValue)
-                        .font(.caption)
+                        .font(Typography.meta)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -104,10 +109,14 @@ struct AdminView: View {
                     Button("Unban") { Task { await unban(user.id) } }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .accessibilityLabel("Unban \(user.email)")
                 } else {
                     Button("Ban") { Task { await ban(user.id) } }
                         .buttonStyle(.bordered)
+                        .tint(.red)
                         .controlSize(.small)
+                        .accessibilityLabel("Ban \(user.email)")
+                        .accessibilityHint("Prevents this user from accessing the service")
                 }
             }
         }
@@ -120,13 +129,14 @@ struct AdminView: View {
                 VStack(alignment: .leading) {
                     Text(report.reason)
                     Text("Wallpaper: \(report.wallpaperID)")
-                        .font(.caption)
+                        .font(Typography.meta)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("Dismiss") { Task { await dismissReport(report.id) } }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .accessibilityLabel("Dismiss report for wallpaper \(report.wallpaperID)")
             }
         }
         .task { await loadReports() }
@@ -138,7 +148,7 @@ struct AdminView: View {
         isLoading = true
         defer { isLoading = false }
         do {
-            let response = try await api.listQueue()
+            let response = try await appState.api.listQueue()
             pendingWallpapers = response.wallpapers
         } catch {
             errorMessage = error.localizedDescription
@@ -147,7 +157,7 @@ struct AdminView: View {
 
     private func approve(_ id: String) async {
         do {
-            try await api.approveWallpaper(id: id)
+            try await appState.api.approveWallpaper(id: id)
             pendingWallpapers.removeAll { $0.id == id }
         } catch {
             errorMessage = error.localizedDescription
@@ -156,7 +166,7 @@ struct AdminView: View {
 
     private func reject(_ id: String) async {
         do {
-            try await api.rejectWallpaper(id: id, reason: "Rejected by admin")
+            try await appState.api.rejectWallpaper(id: id, reason: "Rejected by admin")
             pendingWallpapers.removeAll { $0.id == id }
         } catch {
             errorMessage = error.localizedDescription
@@ -165,7 +175,7 @@ struct AdminView: View {
 
     private func loadUsers() async {
         do {
-            let response = try await api.listUsers()
+            let response = try await appState.api.listUsers()
             users = response.users
         } catch {
             errorMessage = error.localizedDescription
@@ -174,7 +184,7 @@ struct AdminView: View {
 
     private func ban(_ id: String) async {
         do {
-            try await api.banUser(id: id)
+            try await appState.api.banUser(id: id)
             await loadUsers()
         } catch {
             errorMessage = error.localizedDescription
@@ -183,7 +193,7 @@ struct AdminView: View {
 
     private func unban(_ id: String) async {
         do {
-            try await api.unbanUser(id: id)
+            try await appState.api.unbanUser(id: id)
             await loadUsers()
         } catch {
             errorMessage = error.localizedDescription
@@ -192,7 +202,7 @@ struct AdminView: View {
 
     private func loadReports() async {
         do {
-            let response = try await api.listReports()
+            let response = try await appState.api.listReports()
             reports = response.reports
         } catch {
             errorMessage = error.localizedDescription
@@ -201,7 +211,7 @@ struct AdminView: View {
 
     private func dismissReport(_ id: String) async {
         do {
-            try await api.dismissReport(id: id)
+            try await appState.api.dismissReport(id: id)
             reports.removeAll { $0.id == id }
         } catch {
             errorMessage = error.localizedDescription

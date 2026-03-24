@@ -10,11 +10,13 @@ struct FavoritesView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.lg) {
                 Text("Your Favorites")
-                    .font(.title2).fontWeight(.bold)
+                    .font(Typography.pageTitle)
                     .padding(.horizontal)
 
                 if isLoading {
-                    ProgressView().frame(maxWidth: .infinity)
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .accessibilityLabel("Loading favorites")
                 } else if favorites.isEmpty {
                     EmptyStateView(
                         icon: "heart",

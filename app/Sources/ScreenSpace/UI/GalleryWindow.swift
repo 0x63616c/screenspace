@@ -8,7 +8,7 @@ final class GalleryWindowController {
     func show(appState: AppState) {
         if let window = window {
             window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            NSApp.activate()
             return
         }
 
@@ -29,7 +29,7 @@ final class GalleryWindowController {
         window.makeKeyAndOrderFront(nil)
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 900, height: 600)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
 
         self.window = window
     }
@@ -43,7 +43,9 @@ enum GallerySection: String, CaseIterable, Identifiable {
     case playlists = "Playlists"
     case admin = "Admin"
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var icon: String {
         switch self {
@@ -141,7 +143,6 @@ struct GalleryContentView: View {
         }
     }
 
-    @ViewBuilder
     private var detailView: some View {
         Group {
             switch selectedSection {

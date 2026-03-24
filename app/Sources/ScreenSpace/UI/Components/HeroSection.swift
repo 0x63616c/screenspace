@@ -13,7 +13,7 @@ struct HeroSection: View {
                     LinearGradient(
                         colors: [
                             Color(red: 0.1, green: 0.15, blue: 0.3),
-                            Color(red: 0.15, green: 0.1, blue: 0.25),
+                            Color(red: 0.15, green: 0.1, blue: 0.25)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -29,7 +29,7 @@ struct HeroSection: View {
             // Content overlay - glass card floating at bottom
             VStack(alignment: .leading, spacing: 10) {
                 Text("FEATURED")
-                    .font(.caption)
+                    .font(Typography.meta)
                     .fontWeight(.heavy)
                     .tracking(1.5)
                     .foregroundStyle(.white.opacity(0.6))
@@ -43,7 +43,7 @@ struct HeroSection: View {
                     HStack(spacing: 12) {
                         ResolutionBadge(width: wp.width, height: wp.height)
                         Text(wp.durationLabel)
-                            .font(.caption)
+                            .font(Typography.meta)
                             .foregroundStyle(.white.opacity(0.5))
                     }
                 }

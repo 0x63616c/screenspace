@@ -36,12 +36,11 @@ struct DetailView: View {
                 GlassCard {
                     VStack(alignment: .leading, spacing: Spacing.md) {
                         Text(wallpaper.title)
-                            .font(.title2)
-                            .fontWeight(.bold)
+                            .font(Typography.pageTitle)
 
                         if let category = wallpaper.category {
                             Text(category.rawValue.capitalized)
-                                .font(.caption)
+                                .font(Typography.meta)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(.quaternary)
@@ -58,14 +57,16 @@ struct DetailView: View {
                             Label("\(wallpaper.downloadCount) downloads", systemImage: "arrow.down.circle")
                                 .accessibilityLabel("\(wallpaper.downloadCount) downloads")
                         }
-                        .font(.caption)
+                        .font(Typography.meta)
                         .foregroundStyle(.secondary)
+                        .accessibilityElement(children: .combine)
 
                         if let tags = wallpaper.tags, !tags.isEmpty {
                             FlowLayout(spacing: 4) {
                                 ForEach(tags, id: \.self) { tag in
                                     Text(tag)
-                                        .font(.caption)
+                                        .font(Typography.meta)
+                                        .accessibilityLabel("Tag: \(tag)")
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 4)
                                         .background(.quaternary)
@@ -80,16 +81,22 @@ struct DetailView: View {
                             }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.regular)
+                            .accessibilityLabel("Set \(wallpaper.title) as wallpaper")
+                            .accessibilityHint("Downloads and plays this wallpaper on your desktop")
 
                             Button(action: setAsLockScreen) {
                                 Label("Lock Screen", systemImage: "lock.rectangle")
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.regular)
+                            .accessibilityLabel("Set as lock screen")
+                            .accessibilityHint("Uses a still frame from this wallpaper as your lock screen")
 
                             if isDownloading {
                                 ProgressView(value: downloadProgress)
                                     .frame(width: 100)
+                                    .accessibilityLabel("Downloading wallpaper")
+                                    .accessibilityValue("\(Int(downloadProgress * 100))%")
                             }
 
                             Button(action: {
@@ -102,6 +109,8 @@ struct DetailView: View {
                             })
                             .buttonStyle(.bordered)
                             .controlSize(.regular)
+                            .accessibilityLabel(isFavorited ? "Remove from favorites" : "Add to favorites")
+                            .accessibilityValue(isFavorited ? "Favorited" : "Not favorited")
 
                             Button(action: {
                                 guard appState.isLoggedIn else { return }
@@ -111,6 +120,8 @@ struct DetailView: View {
                             })
                             .buttonStyle(.bordered)
                             .controlSize(.regular)
+                            .accessibilityLabel("Report wallpaper")
+                            .accessibilityHint("Report this content as inappropriate")
                         }
                     }
                     .padding()
@@ -121,7 +132,7 @@ struct DetailView: View {
         .sheet(isPresented: $showReportSheet) {
             VStack(spacing: Spacing.lg) {
                 Text("Report Wallpaper")
-                    .font(.headline)
+                    .font(Typography.label)
                 TextField("Reason for reporting", text: $reportReason)
                     .textFieldStyle(.roundedBorder)
                 HStack {
@@ -223,7 +234,14 @@ struct VideoPreview: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ nsView: AVPlayerView, context: Context) {}
+    func updateNSView(_ nsView: AVPlayerView, context: Context) {
+        guard let currentAsset = nsView.player?.currentItem?.asset as? AVURLAsset,
+              currentAsset.url != url else { return }
+        let player = AVPlayer(url: url)
+        player.isMuted = true
+        nsView.player = player
+        player.play()
+    }
 
     static func dismantleNSView(_ nsView: AVPlayerView, coordinator: Coordinator) {
         nsView.player?.pause()

@@ -62,7 +62,7 @@ struct SettingsView: View {
                 }
 
             Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0-dev")")
-                .font(.caption)
+                .font(Typography.meta)
                 .foregroundStyle(.secondary)
         }
         .settingsTabStyle()
@@ -117,6 +117,8 @@ struct SettingsView: View {
                 try? CacheManager.shared.clearCache()
                 cacheSize = 0
             }
+            .accessibilityLabel("Clear cache")
+            .accessibilityHint("Removes all downloaded wallpapers from cache")
         }
         .settingsTabStyle()
     }
@@ -124,7 +126,7 @@ struct SettingsView: View {
     private var displaysTab: some View {
         Form {
             Text("Per-Display Wallpaper Assignment")
-                .font(.headline)
+                .font(Typography.label)
 
             ForEach(NSScreen.screens, id: \.self) { screen in
                 let displayID = DisplayIdentifier.stableID(for: screen)

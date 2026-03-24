@@ -18,6 +18,8 @@ struct ExploreView: View {
                     TextField("Search wallpapers", text: $searchQuery)
                         .textFieldStyle(.plain)
                         .onSubmit { Task { await search() } }
+                        .accessibilityLabel("Search wallpapers")
+                        .accessibilityHint("Type to search community wallpapers")
                 }
                 .padding(Spacing.sm)
                 .background(.quaternary)
@@ -27,19 +29,21 @@ struct ExploreView: View {
                 // Categories grid
                 if selectedCategory == nil && results.isEmpty {
                     Text("Categories")
-                        .font(.title3).fontWeight(.bold)
+                        .font(Typography.sectionTitle)
                         .padding(.horizontal)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: Spacing.md) {
                         ForEach(categories, id: \.self) { category in
                             Button(action: { Task { await selectCategory(category) } }) {
                                 Text(category.capitalized)
-                                    .font(.headline)
+                                    .font(Typography.label)
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 80)
                                     .background(.quaternary)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("\(category.capitalized) category")
+                            .accessibilityHint("Browse \(category) wallpapers")
                         }
                     }
                     .padding(.horizontal)
@@ -48,11 +52,15 @@ struct ExploreView: View {
                 // Results header with back button
                 if let category = selectedCategory {
                     HStack {
-                        Button(action: { selectedCategory = nil; results = [] }) {
+                        Button(action: { selectedCategory = nil
+                            results = []
+                        }) {
                             Image(systemName: "chevron.left")
                         }
+                        .accessibilityLabel("Back to categories")
+                        .accessibilityHint("Clears current category selection")
                         Text(category.capitalized)
-                            .font(.title3).fontWeight(.bold)
+                            .font(Typography.sectionTitle)
                     }
                     .padding(.horizontal)
                 }

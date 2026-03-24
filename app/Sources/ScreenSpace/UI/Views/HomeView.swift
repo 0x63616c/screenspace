@@ -36,7 +36,7 @@ struct HomeView: View {
                     if let error = loadError {
                         VStack(spacing: Spacing.md) {
                             Text(error)
-                                .font(.callout)
+                                .font(Typography.meta)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
                         }
@@ -56,7 +56,7 @@ struct HomeView: View {
                                 Task { _ = try? await appState.api.toggleFavorite(id: f.id) }
                             }
                         )
-                            .padding(.horizontal, Spacing.xl)
+                        .padding(.horizontal, Spacing.xl)
 
                         ShelfRow(title: "Popular", wallpapers: popular, onSelectWallpaper: { data in
                             fetchAndShow(id: data.id)
@@ -92,5 +92,4 @@ struct HomeView: View {
             selectedWallpaper = try? await appState.api.getWallpaper(id: id)
         }
     }
-
 }

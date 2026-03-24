@@ -12,18 +12,21 @@ struct LoginView: View {
     var body: some View {
         VStack(spacing: Spacing.lg) {
             Text(isRegistering ? "Create Account" : "Log In")
-                .font(.title2).fontWeight(.bold)
+                .font(Typography.pageTitle)
 
             TextField("Email", text: $email)
                 .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Email address")
 
             SecureField("Password", text: $password)
                 .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Password")
+                .accessibilityHint("Minimum 8 characters")
 
             if let error = errorMessage {
                 Text(error)
                     .foregroundStyle(.red)
-                    .font(.caption)
+                    .font(Typography.meta)
             }
 
             HStack {
@@ -35,6 +38,7 @@ struct LoginView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(email.isEmpty || password.isEmpty || isLoading)
+                .accessibilityLabel(isRegistering ? "Create account" : "Log in")
             }
 
             Button(isRegistering ? "Already have an account? Log in" : "Don't have an account? Create one") {
@@ -42,7 +46,8 @@ struct LoginView: View {
                 errorMessage = nil
             }
             .buttonStyle(.plain)
-            .font(.caption)
+            .font(Typography.meta)
+            .accessibilityAddTraits([.isButton, .isLink])
         }
         .padding()
         .frame(width: 350)

@@ -19,8 +19,7 @@ struct UploadView: View {
     var body: some View {
         VStack(spacing: Spacing.lg) {
             Text("Upload Wallpaper")
-                .font(.title2)
-                .fontWeight(.bold)
+                .font(Typography.pageTitle)
 
             // File picker
             GroupBox {
@@ -31,10 +30,11 @@ struct UploadView: View {
                             Text(url.lastPathComponent)
                             Spacer()
                             if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-                               let size = attrs[.size] as? Int {
+                               let size = attrs[.size] as? Int
+                            {
                                 let mb = Double(size) / 1_000_000
                                 Text(String(format: "%.1f MB", mb))
-                                    .font(.caption)
+                                    .font(Typography.meta)
                                     .foregroundStyle(mb > 200 ? .red : .secondary)
                             }
                             Button("Change") { pickFile() }
@@ -42,14 +42,17 @@ struct UploadView: View {
                                 .controlSize(.small)
                         }
                         if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-                           let size = attrs[.size] as? Int, Double(size) / 1_000_000 > 200 {
+                           let size = attrs[.size] as? Int, Double(size) / 1_000_000 > 200
+                        {
                             Text("File exceeds 200 MB limit")
-                                .font(.caption).foregroundStyle(.red)
+                                .font(Typography.meta).foregroundStyle(.red)
                         }
                     }
                 } else {
                     Button("Select Video File") { pickFile() }
                         .buttonStyle(.bordered)
+                        .accessibilityLabel("Select video file")
+                        .accessibilityHint("Opens file picker for MP4 or MOV files")
                 }
             }
 
@@ -75,23 +78,29 @@ struct UploadView: View {
                         .foregroundStyle(.blue)
                         .underline()
                         .onTapGesture {
-                            NSWorkspace.shared.open(URL(string: "https://github.com/0x63616c/screenspace/blob/main/CONTENT_POLICY.md")!)
+                            if let url =
+                                URL(string: "https://github.com/0x63616c/screenspace/blob/main/CONTENT_POLICY.md")
+                            {
+                                NSWorkspace.shared.open(url)
+                            }
                         }
                     Text("and I have the rights to upload it")
                 }
-                .font(.caption)
+                .font(Typography.meta)
             }
+            .accessibilityLabel("Content policy agreement")
+            .accessibilityValue(acceptedPolicy ? "Agreed" : "Not agreed")
 
             if let error = errorMessage {
                 Text(error)
                     .foregroundStyle(.red)
-                    .font(.caption)
+                    .font(Typography.meta)
             }
 
             if isUploading {
                 ProgressView(value: uploadProgress)
                 Text("Uploading...")
-                    .font(.caption)
+                    .font(Typography.meta)
                     .foregroundStyle(.secondary)
             }
 
@@ -109,6 +118,8 @@ struct UploadView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.regular)
                     .disabled(!canUpload)
+                    .accessibilityLabel("Upload wallpaper")
+                    .accessibilityHint("Submits your wallpaper for review")
             }
         }
         .padding()
@@ -163,7 +174,9 @@ struct UploadView: View {
             uploadRequest.setValue("video/mp4", forHTTPHeaderField: "Content-Type")
             let fileData = try Data(contentsOf: fileURL)
             let (_, response) = try await URLSession.shared.upload(for: uploadRequest, from: fileData)
-            guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200 ..< 300).contains(httpResponse.statusCode)
+            else {
                 throw APIClient.APIError.httpError(statusCode: 0, message: "Upload to storage failed")
             }
 
