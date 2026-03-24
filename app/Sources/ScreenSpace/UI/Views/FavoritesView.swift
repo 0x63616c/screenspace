@@ -2,9 +2,26 @@ import SwiftUI
 
 struct FavoritesView: View {
     @Environment(AppState.self) var appState
-    @State private var favorites: [WallpaperCardData] = []
-    @State private var isLoading = true
-    @State private var selectedWallpaper: WallpaperResponse?
+    @State private var viewModel: FavoritesViewModel?
+
+    var body: some View {
+        Group {
+            if let viewModel {
+                FavoritesContentView(viewModel: viewModel)
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            if viewModel == nil {
+                viewModel = FavoritesViewModel(api: appState.apiService, eventLog: appState.eventLog)
+            }
+        }
+    }
+}
+
+private struct FavoritesContentView: View {
+    @Bindable var viewModel: FavoritesViewModel
 
     var body: some View {
         ScrollView {
@@ -13,11 +30,11 @@ struct FavoritesView: View {
                     .font(Typography.pageTitle)
                     .padding(.horizontal)
 
-                if isLoading {
+                if viewModel.isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                         .accessibilityLabel("Loading favorites")
-                } else if favorites.isEmpty {
+                } else if viewModel.favorites.isEmpty {
                     EmptyStateView(
                         icon: "heart",
                         title: "No favorites yet",
@@ -25,9 +42,9 @@ struct FavoritesView: View {
                     )
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 200))], spacing: Spacing.md) {
-                        ForEach(favorites) { wp in
+                        ForEach(viewModel.favorites) { wp in
                             WallpaperCard(data: wp, onTap: {
-                                Task { selectedWallpaper = try? await appState.api.getWallpaper(id: wp.id) }
+                                Task { await viewModel.fetchDetail(id: wp.id) }
                             })
                         }
                     }
@@ -36,19 +53,9 @@ struct FavoritesView: View {
             }
             .padding(.vertical)
         }
-        .task { await loadFavorites() }
-        .sheet(item: $selectedWallpaper) { wp in
-            DetailView(wallpaper: wp)
+        .task { await viewModel.load() }
+        .sheet(item: $viewModel.selectedDetail) { detail in
+            DetailView(wallpaper: detail)
         }
-    }
-
-    private func loadFavorites() async {
-        do {
-            let response = try await appState.api.listFavorites()
-            favorites = response.wallpapers.map { $0.toCardData() }
-        } catch {
-            favorites = []
-        }
-        isLoading = false
     }
 }
