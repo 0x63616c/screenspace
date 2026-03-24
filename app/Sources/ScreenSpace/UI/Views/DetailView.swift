@@ -57,12 +57,7 @@ private struct DetailContentView: View {
                             .font(Typography.pageTitle)
 
                         if let category = viewModel.wallpaper.category {
-                            Text(category.rawValue.capitalized)
-                                .font(Typography.meta)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(.quaternary)
-                                .clipShape(Capsule())
+                            PillBadge(text: category.rawValue.capitalized)
                         }
 
                         HStack(spacing: Spacing.lg) {
@@ -82,13 +77,8 @@ private struct DetailContentView: View {
                         if !viewModel.wallpaper.tags.isEmpty {
                             FlowLayout(spacing: 4) {
                                 ForEach(viewModel.wallpaper.tags, id: \.self) { tag in
-                                    Text(tag)
-                                        .font(Typography.meta)
+                                    PillBadge(text: tag)
                                         .accessibilityLabel("Tag: \(tag)")
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(.quaternary)
-                                        .clipShape(Capsule())
                                 }
                             }
                         }
