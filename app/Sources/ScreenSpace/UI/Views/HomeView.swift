@@ -27,26 +27,11 @@ private struct HomeContentView: View {
     var body: some View {
         ScrollView {
             if viewModel.isLoading {
-                VStack {
-                    Spacer(minLength: 100)
-                    ProgressView("Loading wallpapers...")
-                    Spacer(minLength: 100)
-                }
-                .frame(maxWidth: .infinity)
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, Spacing.xxl)
             } else {
                 VStack(alignment: .leading, spacing: Spacing.xxl) {
-                    if let error = viewModel.error {
-                        VStack(spacing: Spacing.md) {
-                            Text(error)
-                                .font(Typography.meta)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, Spacing.xl)
-                        .padding(.top, Spacing.xxl)
-                    }
-
                     if !viewModel.popular.isEmpty || !viewModel.recent.isEmpty {
                         HeroSection(
                             wallpaper: viewModel.featured,
@@ -79,5 +64,9 @@ private struct HomeContentView: View {
         .sheet(item: $viewModel.selectedDetail) { detail in
             DetailView(wallpaper: detail)
         }
+        .errorAlert(message: Binding(
+            get: { viewModel.error },
+            set: { viewModel.error = $0 }
+        ))
     }
 }
