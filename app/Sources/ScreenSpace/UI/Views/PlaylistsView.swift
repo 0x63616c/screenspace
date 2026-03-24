@@ -86,14 +86,14 @@ struct PlaylistsView: View {
                 .accessibilityLabel("Shuffle \(playlist.name)")
                 .accessibilityValue(playlist.shuffle ? "On" : "Off")
 
-                Button(role: .destructive) {
+                Button(action: {
                     Task {
                         try? await appState.playlistManager.delete(id: playlist.id)
                         playlists = await appState.playlistManager.playlists
                     }
-                } label: {
+                }, label: {
                     Image(systemName: "trash")
-                }
+                })
                 .buttonStyle(.bordered)
                 .tint(.red)
                 .accessibilityLabel("Delete \(playlist.name)")
