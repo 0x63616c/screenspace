@@ -128,7 +128,7 @@ final class APIService: APIProviding {
     func listUsers(query: String?, limit: Int, offset: Int) async throws -> PagedUsers {
         let response = try await client.listUsers(query: query, limit: limit, offset: offset)
         return PagedUsers(
-            items: response.users.map {
+            items: response.items.map {
                 UserInfo(id: $0.id, email: $0.email, role: $0.role, banned: $0.banned ?? false, createdAt: $0.createdAt)
             },
             total: response.total,
@@ -152,7 +152,7 @@ final class APIService: APIProviding {
     func listReports(limit: Int, offset: Int) async throws -> PagedReports {
         let response = try await client.listReports(limit: limit, offset: offset)
         return PagedReports(
-            items: response.reports.map {
+            items: response.items.map {
                 ReportInfo(
                     id: $0.id,
                     wallpaperID: $0.wallpaperID,
@@ -175,7 +175,7 @@ final class APIService: APIProviding {
 
     private func mapWallpaperList(_ response: WallpaperListResponse, limit: Int, offset: Int) -> PagedWallpapers {
         PagedWallpapers(
-            items: response.wallpapers.map { wp in
+            items: response.items.map { wp in
                 WallpaperCardData(
                     id: wp.id,
                     title: wp.title,

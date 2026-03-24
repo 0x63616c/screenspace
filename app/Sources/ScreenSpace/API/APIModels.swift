@@ -1,18 +1,20 @@
 import Foundation
 
 // MARK: - Auth
-struct AuthRequest: Codable, Sendable {
+
+struct AuthRequest: Codable {
     let email: String
     let password: String
 }
 
-struct AuthResponse: Codable, Sendable {
+struct AuthResponse: Codable {
     let token: String
     let role: UserRole
 }
 
 // MARK: - Categories
-struct CategoriesResponse: Codable, Sendable {
+
+struct CategoriesResponse: Codable {
     let categories: [String]
 
     /// Fallback categories used when the API is unavailable.
@@ -20,7 +22,8 @@ struct CategoriesResponse: Codable, Sendable {
 }
 
 // MARK: - Wallpapers
-struct WallpaperResponse: Codable, Identifiable, Sendable {
+
+struct WallpaperResponse: Codable, Identifiable {
     let id: String
     let title: String
     let resolution: String
@@ -51,12 +54,14 @@ struct WallpaperResponse: Codable, Identifiable, Sendable {
     }
 }
 
-struct WallpaperListResponse: Codable, Sendable {
-    let wallpapers: [WallpaperResponse]
+struct WallpaperListResponse: Codable {
+    let items: [WallpaperResponse]
     let total: Int
+    let limit: Int
+    let offset: Int
 }
 
-struct UploadInitResponse: Codable, Sendable {
+struct UploadInitResponse: Codable {
     let id: String
     let uploadURL: String
 
@@ -67,7 +72,8 @@ struct UploadInitResponse: Codable, Sendable {
 }
 
 // MARK: - User
-struct UserResponse: Codable, Identifiable, Sendable {
+
+struct UserResponse: Codable, Identifiable {
     let id: String
     let email: String
     let role: UserRole
@@ -80,13 +86,16 @@ struct UserResponse: Codable, Identifiable, Sendable {
     }
 }
 
-struct UserListResponse: Codable, Sendable {
-    let users: [UserResponse]
+struct UserListResponse: Codable {
+    let items: [UserResponse]
     let total: Int
+    let limit: Int
+    let offset: Int
 }
 
 // MARK: - Reports
-struct ReportResponse: Codable, Identifiable, Sendable {
+
+struct ReportResponse: Codable, Identifiable {
     let id: String
     let wallpaperID: String
     let reporterID: String
@@ -102,7 +111,9 @@ struct ReportResponse: Codable, Identifiable, Sendable {
     }
 }
 
-struct ReportListResponse: Codable, Sendable {
-    let reports: [ReportResponse]
+struct ReportListResponse: Codable {
+    let items: [ReportResponse]
     let total: Int
+    let limit: Int
+    let offset: Int
 }
