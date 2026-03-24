@@ -48,4 +48,14 @@ final class HomeViewModel {
     func clearDetail() {
         selectedDetail = nil
     }
+
+    func toggleFavorite(id: String, isLoggedIn: Bool) async {
+        guard isLoggedIn else { return }
+        do {
+            _ = try await api.toggleFavorite(id: id)
+            eventLog.log("favorite_toggled", data: ["id": id])
+        } catch {
+            self.error = "Failed to update favorite."
+        }
+    }
 }
