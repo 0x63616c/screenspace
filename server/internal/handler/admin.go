@@ -217,7 +217,7 @@ func (h *AdminHandler) BanUser(w http.ResponseWriter, r *http.Request) error {
 		return Internal(fmt.Errorf("ban user: %w", err))
 	}
 	h.bannedCache.Evict(id.String())
-	slog.Info("user banned", "admin_id", claims.UserID, "target_user_id", id)
+	slog.Info("user banned", "admin_id", claims.UserID, "target_user_id", id) //nolint:gosec // structured log
 	return respond.JSON(w, http.StatusOK, map[string]string{"status": "banned"})
 }
 
@@ -235,7 +235,7 @@ func (h *AdminHandler) UnbanUser(w http.ResponseWriter, r *http.Request) error {
 		return Internal(fmt.Errorf("unban user: %w", err))
 	}
 	h.bannedCache.Evict(id.String())
-	slog.Info("user unbanned", "admin_id", claims.UserID, "target_user_id", id)
+	slog.Info("user unbanned", "admin_id", claims.UserID, "target_user_id", id) //nolint:gosec // structured log
 	return respond.JSON(w, http.StatusOK, map[string]string{"status": "unbanned"})
 }
 
@@ -259,7 +259,7 @@ func (h *AdminHandler) PromoteUser(w http.ResponseWriter, r *http.Request) error
 	if err := h.q.SetRole(r.Context(), db.SetRoleParams{ID: id, Role: string(types.RoleAdmin)}); err != nil {
 		return Internal(fmt.Errorf("promote user: %w", err))
 	}
-	slog.Info("user promoted", "admin_id", claims.UserID, "target_user_id", id)
+	slog.Info("user promoted", "admin_id", claims.UserID, "target_user_id", id) //nolint:gosec // structured log
 	return respond.JSON(w, http.StatusOK, map[string]string{"status": "promoted"})
 }
 
@@ -301,6 +301,6 @@ func (h *AdminHandler) DismissReport(w http.ResponseWriter, r *http.Request) err
 	if err := h.q.DismissReport(r.Context(), id); err != nil {
 		return Internal(fmt.Errorf("dismiss report: %w", err))
 	}
-	slog.Info("report dismissed", "admin_id", claims.UserID, "report_id", id)
+	slog.Info("report dismissed", "admin_id", claims.UserID, "report_id", id) //nolint:gosec // structured log
 	return respond.JSON(w, http.StatusOK, map[string]string{"status": "dismissed"})
 }

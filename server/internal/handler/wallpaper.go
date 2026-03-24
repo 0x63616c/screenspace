@@ -232,7 +232,7 @@ func (h *WallpaperHandler) Download(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	if err := h.q.IncrementDownloadCount(r.Context(), wp.ID); err != nil {
-		slog.Error("increment download count", "wallpaper_id", wp.ID, "error", err)
+		slog.Error("increment download count", "wallpaper_id", wp.ID, "error", err) //nolint:gosec // structured log
 	}
 
 	return respond.JSON(w, http.StatusOK, map[string]string{"download_url": url})

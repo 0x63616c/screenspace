@@ -17,6 +17,7 @@ type ReportService struct {
 	cfg *config.Config
 }
 
+// NewReportService creates a new ReportService.
 func NewReportService(q db.Querier, cfg *config.Config) *ReportService {
 	return &ReportService{db: q, cfg: cfg}
 }

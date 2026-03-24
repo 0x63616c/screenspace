@@ -3,6 +3,7 @@ package types
 // WallpaperStatus represents the lifecycle state of a wallpaper.
 type WallpaperStatus string
 
+// WallpaperStatus values.
 const (
 	StatusPending       WallpaperStatus = "pending"
 	StatusPendingReview WallpaperStatus = "pending_review"
@@ -22,6 +23,7 @@ func (s WallpaperStatus) Valid() bool {
 // UserRole represents the access level of a user account.
 type UserRole string
 
+// UserRole values.
 const (
 	RoleUser  UserRole = "user"
 	RoleAdmin UserRole = "admin"
@@ -39,6 +41,7 @@ func (r UserRole) Valid() bool {
 // Category represents the content category of a wallpaper.
 type Category string
 
+// Category values.
 const (
 	CategoryNature     Category = "nature"
 	CategoryAbstract   Category = "abstract"
@@ -77,6 +80,7 @@ func (c Category) Valid() bool {
 // SortOrder controls list ordering for wallpaper queries.
 type SortOrder string
 
+// SortOrder values.
 const (
 	SortRecent  SortOrder = "recent"
 	SortPopular SortOrder = "popular"

@@ -15,6 +15,7 @@ type FavoriteService struct {
 	db db.Querier
 }
 
+// NewFavoriteService creates a new FavoriteService.
 func NewFavoriteService(q db.Querier) *FavoriteService {
 	return &FavoriteService{db: q}
 }

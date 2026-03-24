@@ -1,6 +1,7 @@
 package handler_test
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -21,7 +22,7 @@ func TestWrap_NoError(t *testing.T) {
 		return nil
 	})
 	w := httptest.NewRecorder()
-	h(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	h(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", w.Code)
 	}
@@ -33,7 +34,7 @@ func TestWrap_AppError(t *testing.T) {
 		return handler.NotFound("wallpaper not found")
 	})
 	w := httptest.NewRecorder()
-	h(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	h(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
 	if w.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", w.Code)
 	}
@@ -45,7 +46,7 @@ func TestWrap_SentinelError(t *testing.T) {
 		return handler.ErrForbidden
 	})
 	w := httptest.NewRecorder()
-	h(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	h(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
 	if w.Code != http.StatusForbidden {
 		t.Errorf("expected 403, got %d", w.Code)
 	}
@@ -57,7 +58,7 @@ func TestWrap_UnknownError(t *testing.T) {
 		return errors.New("something exploded")
 	})
 	w := httptest.NewRecorder()
-	h(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	h(w, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil))
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", w.Code)
 	}

@@ -9,12 +9,12 @@ import (
 	"github.com/0x63616c/screenspace/server/internal/respond"
 )
 
-// HandlerFunc is an http.HandlerFunc that returns an error.
-type HandlerFunc func(w http.ResponseWriter, r *http.Request) error
+// Func is an http.HandlerFunc that returns an error.
+type Func func(w http.ResponseWriter, r *http.Request) error
 
-// Wrap converts a HandlerFunc into an http.HandlerFunc. If the handler
+// Wrap converts a Func into an http.HandlerFunc. If the handler
 // returns an error, it is mapped to an appropriate HTTP response.
-func Wrap(h HandlerFunc) http.HandlerFunc {
+func Wrap(h Func) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := h(w, r); err != nil {
 			handleError(w, r, err)
@@ -25,7 +25,7 @@ func Wrap(h HandlerFunc) http.HandlerFunc {
 func handleError(w http.ResponseWriter, r *http.Request, err error) {
 	if appErr, ok := errors.AsType[*apperr.Error](err); ok {
 		if appErr.Status >= 500 {
-			slog.Error("request error",
+			slog.Error("request error", //nolint:gosec // structured log with typed fields
 				"method", r.Method,
 				"path", r.URL.Path,
 				"status", appErr.Status,
@@ -47,7 +47,7 @@ func handleError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, apperr.ErrBadRequest):
 		respond.Error(w, http.StatusBadRequest, "bad_request", "bad request")
 	default:
-		slog.Error("unhandled request error",
+		slog.Error("unhandled request error", //nolint:gosec // structured log with typed fields
 			"method", r.Method,
 			"path", r.URL.Path,
 			"error", err,

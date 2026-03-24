@@ -51,7 +51,7 @@ func TestRateLimiter_PerIP_Blocks(t *testing.T) {
 
 	for i, wantCode := range []int{http.StatusOK, http.StatusTooManyRequests} {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		r.RemoteAddr = "1.2.3.4:9999"
 		h.ServeHTTP(w, r)
 		if w.Code != wantCode {

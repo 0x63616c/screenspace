@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -24,6 +25,7 @@ type AuthService struct {
 	cost   int
 }
 
+// NewAuthService creates a new AuthService.
 func NewAuthService(cfg *config.Config) *AuthService {
 	return &AuthService{
 		secret: []byte(cfg.JWTSecret),
@@ -76,16 +78,16 @@ func (a *AuthService) ValidateToken(tokenStr string) (*TokenClaims, error) {
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
-		return nil, fmt.Errorf("invalid token claims")
+		return nil, errors.New("invalid token claims")
 	}
 
 	sub, ok := claims["sub"].(string)
 	if !ok {
-		return nil, fmt.Errorf("invalid token: missing sub")
+		return nil, errors.New("invalid token: missing sub")
 	}
 	roleStr, ok := claims["role"].(string)
 	if !ok {
-		return nil, fmt.Errorf("invalid token: missing role")
+		return nil, errors.New("invalid token: missing role")
 	}
 
 	return &TokenClaims{UserID: sub, Role: types.UserRole(roleStr)}, nil
