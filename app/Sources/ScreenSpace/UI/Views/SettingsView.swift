@@ -11,12 +11,43 @@ private extension View {
 
 struct SettingsView: View {
     @Environment(AppState.self) var appState
-    @State private var config: AppConfig = .default
-    @State private var cacheSize = 0
-    @State private var serverURL: String = AppConfig.defaultServerURL
+    @State private var viewModel: SettingsViewModel?
     @State private var showLogin = false
-    @State private var settingsError: String?
     @State private var playlists: [Playlist] = []
+
+    var body: some View {
+        Group {
+            if let viewModel {
+                SettingsContentView(
+                    viewModel: viewModel,
+                    appState: appState,
+                    showLogin: $showLogin,
+                    playlists: playlists
+                )
+            } else {
+                ProgressView()
+            }
+        }
+        .frame(width: 500, height: 400)
+        .padding()
+        .task {
+            if viewModel == nil {
+                viewModel = SettingsViewModel(
+                    configStore: appState.configStore,
+                    cache: appState.cache,
+                    eventLog: appState.eventLog
+                )
+            }
+            playlists = await appState.playlistManager.playlists
+        }
+    }
+}
+
+private struct SettingsContentView: View {
+    @Bindable var viewModel: SettingsViewModel
+    let appState: AppState
+    @Binding var showLogin: Bool
+    let playlists: [Playlist]
 
     var body: some View {
         TabView {
@@ -26,41 +57,21 @@ struct SettingsView: View {
             displaysTab.tabItem { Label("Displays", systemImage: "display.2") }
             accountTab.tabItem { Label("Account", systemImage: "person.circle") }
         }
-        .frame(width: 500, height: 400)
-        .padding()
-        .errorAlert(message: $settingsError)
-        .task {
-            config = await appState.configManager.config
-            serverURL = config.serverURL
-            playlists = await appState.playlistManager.playlists
-            cacheSize = appState.cache.currentSizeMB()
-        }
+        .errorAlert(message: Binding(
+            get: { viewModel.error },
+            set: { viewModel.error = $0 }
+        ))
     }
 
     private var generalTab: some View {
         Form {
             Toggle("Launch at login", isOn: Binding(
-                get: { config.launchAtLogin },
-                set: { newValue in
-                    config.launchAtLogin = newValue
-                    do {
-                        if newValue {
-                            try SMAppService.mainApp.register()
-                        } else {
-                            try SMAppService.mainApp.unregister()
-                        }
-                    } catch {
-                        settingsError = "Failed to \(newValue ? "enable" : "disable") launch at login: \(error.localizedDescription)"
-                    }
-                    saveConfig()
-                }
+                get: { viewModel.config.launchAtLogin },
+                set: { viewModel.setLaunchAtLogin($0) }
             ))
 
-            TextField("Server URL", text: $serverURL)
-                .onSubmit {
-                    config.serverURL = serverURL
-                    saveConfig()
-                }
+            TextField("Server URL", text: $viewModel.serverURL)
+                .onSubmit { viewModel.commitServerURL() }
 
             Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0-dev")")
                 .font(Typography.meta)
@@ -72,24 +83,18 @@ struct SettingsView: View {
     private var playbackTab: some View {
         Form {
             Toggle("Pause on battery", isOn: Binding(
-                get: { config.pauseOnBattery },
-                set: { config.pauseOnBattery = $0
-                    saveConfig()
-                }
+                get: { viewModel.config.pauseOnBattery },
+                set: { newValue in viewModel.updateConfig { $0.pauseOnBattery = newValue } }
             ))
 
             Toggle("Pause when fullscreen app active", isOn: Binding(
-                get: { config.pauseOnFullscreen },
-                set: { config.pauseOnFullscreen = $0
-                    saveConfig()
-                }
+                get: { viewModel.config.pauseOnFullscreen },
+                set: { newValue in viewModel.updateConfig { $0.pauseOnFullscreen = newValue } }
             ))
 
             Picker("Video scaling", selection: Binding(
-                get: { config.videoGravity },
-                set: { config.videoGravity = $0
-                    saveConfig()
-                }
+                get: { viewModel.config.videoGravity },
+                set: { newValue in viewModel.updateConfig { $0.videoGravity = newValue } }
             )) {
                 Text("Fill (crop edges)").tag(VideoGravityOption.resizeAspectFill)
                 Text("Fit (letterbox)").tag(VideoGravityOption.resizeAspect)
@@ -103,20 +108,17 @@ struct SettingsView: View {
             HStack {
                 Text("Cache size")
                 Spacer()
-                Text(formatSize(cacheSize))
+                Text(viewModel.formatSize(viewModel.cacheSize))
                     .foregroundStyle(.secondary)
             }
 
-            Stepper("Cache limit: \(formatSize(config.cacheSizeLimitMB))", value: Binding(
-                get: { config.cacheSizeLimitMB },
-                set: { config.cacheSizeLimitMB = $0
-                    saveConfig()
-                }
+            Stepper("Cache limit: \(viewModel.formatSize(viewModel.config.cacheSizeLimitMB))", value: Binding(
+                get: { viewModel.config.cacheSizeLimitMB },
+                set: { newValue in viewModel.updateConfig { $0.cacheSizeLimitMB = newValue } }
             ), in: 1024 ... 20480, step: 1024)
 
             Button("Clear Cache") {
-                appState.cache.clearCache()
-                cacheSize = 0
+                viewModel.clearCache()
             }
             .accessibilityLabel("Clear cache")
             .accessibilityHint("Removes all downloaded wallpapers from cache")
@@ -138,10 +140,11 @@ struct SettingsView: View {
                     Spacer()
 
                     Picker("Playlist", selection: Binding(
-                        get: { config.screenAssignments[displayID] ?? "" },
+                        get: { viewModel.config.screenAssignments[displayID] ?? "" },
                         set: { newValue in
-                            config.screenAssignments[displayID] = newValue.isEmpty ? nil : newValue
-                            saveConfig()
+                            viewModel.updateConfig { config in
+                                config.screenAssignments[displayID] = newValue.isEmpty ? nil : newValue
+                            }
                         }
                     )) {
                         Text("None").tag("")
@@ -178,17 +181,5 @@ struct SettingsView: View {
         .sheet(isPresented: $showLogin) {
             LoginView()
         }
-    }
-
-    private func saveConfig() {
-        let snapshot = config
-        Task { try? await appState.configManager.setConfig(snapshot) }
-    }
-
-    private func formatSize(_ mb: Int) -> String {
-        if mb >= 1024 {
-            return String(format: "%.1f GB", Double(mb) / 1024.0)
-        }
-        return "\(mb) MB"
     }
 }
