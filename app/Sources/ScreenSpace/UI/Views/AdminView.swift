@@ -50,13 +50,6 @@ private struct AdminContentView: View {
             }
             .padding()
 
-            if let error = viewModel.error {
-                Text(error)
-                    .foregroundStyle(.red)
-                    .font(Typography.meta)
-                    .padding(.horizontal)
-            }
-
             switch viewModel.selectedTab {
             case .queue: queueView
             case .content: contentView
@@ -65,6 +58,10 @@ private struct AdminContentView: View {
             }
         }
         .task { await viewModel.loadQueue() }
+        .errorAlert(message: Binding(
+            get: { viewModel.error },
+            set: { viewModel.error = $0 }
+        ))
     }
 
     private var queueView: some View {
@@ -90,8 +87,11 @@ private struct AdminContentView: View {
         }
         .overlay {
             if viewModel.pendingWallpapers.isEmpty && !viewModel.isLoading {
-                Text("No pending wallpapers")
-                    .foregroundStyle(.secondary)
+                EmptyStateView(
+                    icon: "tray",
+                    title: "No pending wallpapers",
+                    subtitle: "All wallpapers have been reviewed."
+                )
             }
         }
     }
