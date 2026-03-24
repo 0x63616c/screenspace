@@ -6,8 +6,8 @@ struct PillBadge: View {
     var body: some View {
         Text(text)
             .font(Typography.meta)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, Spacing.sm)
+            .padding(.vertical, Spacing.xs)
             .background(.quaternary)
             .clipShape(Capsule())
     }
