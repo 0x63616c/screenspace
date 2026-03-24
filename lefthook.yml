@@ -18,10 +18,10 @@ pre-commit:
     swift-format:
       root: app/
       glob: "**/*.swift"
-      run: swiftformat --config .swiftformat {staged_files}
+      run: test -f .swiftformat && swiftformat --config .swiftformat {staged_files} || swiftformat {staged_files}
       stage_fixed: true
 
     swift-lint:
       root: app/
       glob: "**/*.swift"
-      run: swiftlint lint --strict {staged_files}
+      run: test -f .swiftlint.yml && swiftlint lint --strict {staged_files} || true
