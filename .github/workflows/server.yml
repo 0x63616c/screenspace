@@ -20,9 +20,9 @@ jobs:
           cache-dependency-path: server/go.sum
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v1.64
+          version: v2.11.4
           working-directory: server
           args: --config .golangci.yml --timeout 5m
 
