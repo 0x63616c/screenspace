@@ -39,9 +39,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         appState.engine.start()
-        appState.restoreLastWallpaper()
 
         Task {
+            await appState.restoreLastWallpaper()
             await appState.restoreSession()
         }
 
@@ -98,7 +98,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func skipToNext() {
-        appState.skipToNext()
+        Task { await appState.skipToNext() }
     }
 
     @objc func checkForUpdates() {

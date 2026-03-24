@@ -172,7 +172,7 @@ struct DetailView: View {
     private func setAsWallpaper() {
         Task {
             if let cachedURL = CacheManager.shared.cachedURL(for: wallpaper.id) {
-                appState.setWallpaper(url: cachedURL, title: wallpaper.title)
+                await appState.setWallpaper(url: cachedURL, title: wallpaper.title)
                 return
             }
 
@@ -185,7 +185,7 @@ struct DetailView: View {
             do {
                 let (tempURL, _) = try await URLSession.shared.download(from: downloadURL, delegate: nil)
                 let cachedURL = try CacheManager.shared.cacheFile(from: tempURL, wallpaperID: wallpaper.id)
-                appState.setWallpaper(url: cachedURL, title: wallpaper.title)
+                await appState.setWallpaper(url: cachedURL, title: wallpaper.title)
             } catch {
                 errorMessage = "Download failed: \(error.localizedDescription)"
             }

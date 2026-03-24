@@ -12,11 +12,12 @@ private extension View {
 
 struct SettingsView: View {
     @Environment(AppState.self) var appState
-    @State private var config = ConfigManager.shared.config
+    @State private var config: AppConfig = .default
     @State private var cacheSize = CacheManager.shared.currentCacheSizeMB()
-    @State private var serverURL: String = ConfigManager.shared.config.serverURL
+    @State private var serverURL: String = AppConfig.defaultServerURL
     @State private var showLogin = false
     @State private var settingsError: String?
+    @State private var playlists: [Playlist] = []
 
     var body: some View {
         TabView {
@@ -29,6 +30,11 @@ struct SettingsView: View {
         .frame(width: 500, height: 400)
         .padding()
         .errorAlert(message: $settingsError)
+        .task {
+            config = await appState.configManager.config
+            serverURL = config.serverURL
+            playlists = await appState.playlistManager.playlists
+        }
     }
 
     private var generalTab: some View {
@@ -129,7 +135,7 @@ struct SettingsView: View {
                         }
                     )) {
                         Text("None").tag("")
-                        ForEach(appState.playlistManager.playlists) { playlist in
+                        ForEach(playlists) { playlist in
                             Text(playlist.name).tag(playlist.id)
                         }
                     }
@@ -144,7 +150,7 @@ struct SettingsView: View {
         Form {
             if let user = appState.currentUser {
                 LabeledContent("Email", value: user.email)
-                LabeledContent("Role", value: user.role.capitalized)
+                LabeledContent("Role", value: user.role.rawValue.capitalized)
                 Button("Log Out") {
                     appState.logout()
                 }
@@ -165,7 +171,7 @@ struct SettingsView: View {
     }
 
     private func saveConfig() {
-        try? ConfigManager.shared.update { $0 = config }
+        Task { try? await appState.configManager.update { $0 = config } }
     }
 
     private func formatSize(_ mb: Int) -> String {

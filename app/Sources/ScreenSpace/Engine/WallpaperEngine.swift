@@ -19,19 +19,19 @@ final class WallpaperEngine {
         }
     }
 
-    func setWallpaper(url: URL, forDisplay stableID: String) {
+    func setWallpaper(url: URL, forDisplay stableID: String) async {
         guard let window = windows[stableID] else { return }
-        let gravity = configManager.config.videoGravity.avLayerGravity
+        let gravity = await configManager.config.videoGravity.avLayerGravity
         window.play(url: url, gravity: gravity)
-        try? configManager.update { $0.lastPlayedURL = url.absoluteString }
+        try? await configManager.update { $0.lastPlayedURL = url.absoluteString }
     }
 
-    func setWallpaperOnAllDisplays(url: URL) {
-        let gravity = configManager.config.videoGravity.avLayerGravity
+    func setWallpaperOnAllDisplays(url: URL) async {
+        let gravity = await configManager.config.videoGravity.avLayerGravity
         for window in windows.values {
             window.play(url: url, gravity: gravity)
         }
-        try? configManager.update { $0.lastPlayedURL = url.absoluteString }
+        try? await configManager.update { $0.lastPlayedURL = url.absoluteString }
     }
 
     func pauseAll() { windows.values.forEach { $0.pause() } }

@@ -24,36 +24,35 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(state.isAdmin)
     }
 
-    func testSetWallpaperUpdatesProperties() {
+    func testSetWallpaperUpdatesProperties() async {
         let state = makeAppState()
         let url = URL(fileURLWithPath: "/tmp/test-wallpaper.mp4")
-        state.setWallpaper(url: url, title: "Test Wallpaper")
+        await state.setWallpaper(url: url, title: "Test Wallpaper")
         XCTAssertEqual(state.currentWallpaperURL, url)
         XCTAssertEqual(state.currentWallpaperTitle, "Test Wallpaper")
     }
 
-    func testSetWallpaperDefaultsToFilename() {
+    func testSetWallpaperDefaultsToFilename() async {
         let state = makeAppState()
         let url = URL(fileURLWithPath: "/tmp/my-video.mp4")
-        state.setWallpaper(url: url)
+        await state.setWallpaper(url: url)
         XCTAssertEqual(state.currentWallpaperTitle, "my-video.mp4")
     }
 
-    func testRestoreLastWallpaperWithNonexistentFileDoesNothing() {
+    func testRestoreLastWallpaperWithNonexistentFileDoesNothing() async throws {
         let state = makeAppState()
-        try? state.configManager.update { $0.lastPlayedURL = "file:///nonexistent/path.mp4" }
-        state.restoreLastWallpaper()
+        try await state.configManager.update { $0.lastPlayedURL = "file:///nonexistent/path.mp4" }
+        await state.restoreLastWallpaper()
         XCTAssertNil(state.currentWallpaperURL)
         XCTAssertNil(state.currentWallpaperTitle)
     }
 
     func testLogoutClearsUser() {
         let state = makeAppState()
-        // Simulate a logged-in user
         state.currentUser = UserResponse(
             id: "1",
             email: "test@example.com",
-            role: "user",
+            role: .user,
             banned: false,
             createdAt: nil
         )
@@ -69,21 +68,21 @@ final class AppStateTests: XCTestCase {
         state.currentUser = UserResponse(
             id: "1",
             email: "admin@example.com",
-            role: "admin",
+            role: .admin,
             banned: false,
             createdAt: nil
         )
         XCTAssertTrue(state.isAdmin)
     }
 
-    func testNowPlayingCallbackFires() {
+    func testNowPlayingCallbackFires() async {
         let state = makeAppState()
         var receivedTitle: String?
         state.onNowPlayingChanged = { title in
             receivedTitle = title
         }
         let url = URL(fileURLWithPath: "/tmp/callback-test.mp4")
-        state.setWallpaper(url: url, title: "Callback Test")
+        await state.setWallpaper(url: url, title: "Callback Test")
         XCTAssertEqual(receivedTitle, "Callback Test")
     }
 }

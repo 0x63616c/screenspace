@@ -18,13 +18,13 @@ final class CacheManager: Sendable {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
-    func cacheFile(from sourceURL: URL, wallpaperID: String) throws -> URL {
+    func cacheFile(from sourceURL: URL, wallpaperID: String, cacheSizeLimitMB: Int = AppConfig.default.cacheSizeLimitMB) throws -> URL {
         let destURL = cacheDir.appendingPathComponent("\(wallpaperID).mp4")
         if FileManager.default.fileExists(atPath: destURL.path) {
             try FileManager.default.removeItem(at: destURL)
         }
         try FileManager.default.copyItem(at: sourceURL, to: destURL)
-        evictIfNeeded(limitMB: ConfigManager.shared.config.cacheSizeLimitMB)
+        evictIfNeeded(limitMB: cacheSizeLimitMB)
         return destURL
     }
 

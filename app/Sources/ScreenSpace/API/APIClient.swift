@@ -5,7 +5,7 @@ final class APIClient: @unchecked Sendable {
     private let session: URLSession
 
     init(baseURL: String? = nil) {
-        self.baseURL = baseURL ?? ConfigManager.shared.config.serverURL
+        self.baseURL = baseURL ?? AppConfig.defaultServerURL
         self.session = URLSession.shared
     }
 

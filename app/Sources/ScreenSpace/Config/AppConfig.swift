@@ -1,6 +1,6 @@
 import AVFoundation
 
-enum VideoGravityOption: String, Codable {
+enum VideoGravityOption: String, Codable, Sendable {
     case resizeAspectFill
     case resizeAspect
 
@@ -12,7 +12,7 @@ enum VideoGravityOption: String, Codable {
     }
 }
 
-struct AppConfig: Codable, Equatable {
+struct AppConfig: Codable, Equatable, Sendable {
     var version: Int
     var launchAtLogin: Bool
     var pauseOnBattery: Bool

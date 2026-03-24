@@ -23,7 +23,8 @@ final class AppState {
         engine: WallpaperEngine? = nil,
         api: APIClient? = nil,
         configManager: ConfigManager? = nil,
-        playlistManager: PlaylistManager? = nil
+        playlistManager: PlaylistManager? = nil,
+        initialConfig: AppConfig = .default
     ) {
         let cm = configManager ?? .shared
         self.configManager = cm
@@ -31,7 +32,7 @@ final class AppState {
         self.api = api ?? APIClient()
         self.lockScreen = LockScreenManager()
         self.engine = engine ?? WallpaperEngine(configManager: cm)
-        self.pauseController = PauseController(config: cm.config)
+        self.pauseController = PauseController(config: initialConfig)
 
         // Wire PauseController to Engine via @Observable observation
         Task { @MainActor [weak self] in
@@ -53,15 +54,15 @@ final class AppState {
         }
     }
 
-    func setWallpaper(url: URL, title: String? = nil) {
-        engine.setWallpaperOnAllDisplays(url: url)
+    func setWallpaper(url: URL, title: String? = nil) async {
+        await engine.setWallpaperOnAllDisplays(url: url)
         currentWallpaperURL = url
         currentWallpaperTitle = title ?? url.lastPathComponent
         onNowPlayingChanged?(currentWallpaperTitle)
     }
 
-    func setWallpaper(url: URL, title: String? = nil, forDisplay displayID: String) {
-        engine.setWallpaper(url: url, forDisplay: displayID)
+    func setWallpaper(url: URL, title: String? = nil, forDisplay displayID: String) async {
+        await engine.setWallpaper(url: url, forDisplay: displayID)
         currentWallpaperURL = url
         currentWallpaperTitle = title ?? url.lastPathComponent
         onNowPlayingChanged?(currentWallpaperTitle)
@@ -87,22 +88,23 @@ final class AppState {
         currentUser = try? await api.me()
     }
 
-    func restoreLastWallpaper() {
-        guard let urlString = configManager.config.lastPlayedURL,
+    func restoreLastWallpaper() async {
+        let config = await configManager.config
+        guard let urlString = config.lastPlayedURL,
               let url = URL(string: urlString),
               FileManager.default.fileExists(atPath: url.path) else { return }
-        setWallpaper(url: url)
+        await setWallpaper(url: url)
     }
 
-    func skipToNext() {
-        let playlists = playlistManager.playlists
+    func skipToNext() async {
+        let playlists = await playlistManager.playlists
         guard let playlist = playlists.first, !playlist.items.isEmpty else { return }
         if let firstItem = playlist.items.first,
            let path = firstItem.path,
            firstItem.source == .local {
             let url = URL(fileURLWithPath: path)
             if FileManager.default.fileExists(atPath: url.path) {
-                setWallpaper(url: url, title: url.lastPathComponent)
+                await setWallpaper(url: url, title: url.lastPathComponent)
             }
         }
     }

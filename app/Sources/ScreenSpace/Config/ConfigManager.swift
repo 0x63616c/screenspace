@@ -1,13 +1,14 @@
 import Foundation
 
-final class ConfigManager: @unchecked Sendable {
+actor ConfigManager {
     static let shared = ConfigManager()
 
     private let configURL: URL
     private(set) var config: AppConfig
 
     init(directory: URL? = nil) {
-        let dir = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = directory ?? FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("ScreenSpace")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         self.configURL = dir.appendingPathComponent("config.json")

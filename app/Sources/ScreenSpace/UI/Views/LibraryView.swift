@@ -110,7 +110,7 @@ struct LibraryView: View {
     }
 
     private func setWallpaper(url: URL) {
-        appState.setWallpaper(url: url, title: url.lastPathComponent)
+        Task { await appState.setWallpaper(url: url, title: url.lastPathComponent) }
     }
 }
 

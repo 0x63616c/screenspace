@@ -9,7 +9,6 @@ final class ConfigTests: XCTestCase {
         XCTAssertTrue(config.pauseOnFullscreen)
         XCTAssertEqual(config.videoGravity, .resizeAspectFill)
         XCTAssertEqual(config.cacheSizeLimitMB, 5120)
-        XCTAssertEqual(config.serverURL, "https://api.screenspace.app")
     }
 
     func testConfigRoundTrip() throws {
@@ -19,37 +18,44 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(config, decoded)
     }
 
-    func testConfigManagerWithTempDir() throws {
+    func testConfigManagerWithTempDir() async throws {
         let tmpDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: tmpDir) }
 
         let manager = ConfigManager(directory: tmpDir)
-        XCTAssertEqual(manager.config.version, 1)
+        let config = await manager.config
+        XCTAssertEqual(config.version, 1)
 
-        try manager.update { $0.pauseOnBattery = false }
-        XCTAssertFalse(manager.config.pauseOnBattery)
+        try await manager.update { $0.pauseOnBattery = false }
+        let updated = await manager.config
+        XCTAssertFalse(updated.pauseOnBattery)
 
         let manager2 = ConfigManager(directory: tmpDir)
-        XCTAssertFalse(manager2.config.pauseOnBattery)
+        let reloaded = await manager2.config
+        XCTAssertFalse(reloaded.pauseOnBattery)
     }
 
-    func testPlaylistManagerCRUD() throws {
+    func testPlaylistManagerCRUD() async throws {
         let tmpDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: tmpDir) }
 
         let manager = PlaylistManager(directory: tmpDir)
-        XCTAssertTrue(manager.playlists.isEmpty)
+        let initial = await manager.playlists
+        XCTAssertTrue(initial.isEmpty)
 
-        let playlist = try manager.create(name: "Test")
-        XCTAssertEqual(manager.playlists.count, 1)
+        let playlist = try await manager.create(name: "Test")
+        let afterCreate = await manager.playlists
+        XCTAssertEqual(afterCreate.count, 1)
         XCTAssertEqual(playlist.name, "Test")
 
         var updated = playlist
         updated.name = "Updated"
-        try manager.update(updated)
-        XCTAssertEqual(manager.playlists.first?.name, "Updated")
+        try await manager.update(updated)
+        let afterUpdate = await manager.playlists
+        XCTAssertEqual(afterUpdate.first?.name, "Updated")
 
-        try manager.delete(id: playlist.id)
-        XCTAssertTrue(manager.playlists.isEmpty)
+        try await manager.delete(id: playlist.id)
+        let afterDelete = await manager.playlists
+        XCTAssertTrue(afterDelete.isEmpty)
     }
 }

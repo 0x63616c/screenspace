@@ -1,17 +1,17 @@
 import Foundation
 
-struct PlaylistItem: Codable, Identifiable, Equatable {
+struct PlaylistItem: Codable, Identifiable, Equatable, Sendable {
     let id: String
     let source: Source
     var path: String?
 
-    enum Source: String, Codable {
+    enum Source: String, Codable, Sendable {
         case local
         case community
     }
 }
 
-struct Playlist: Codable, Identifiable, Equatable {
+struct Playlist: Codable, Identifiable, Equatable, Sendable {
     let id: String
     var name: String
     var items: [PlaylistItem]
@@ -29,7 +29,7 @@ struct Playlist: Codable, Identifiable, Equatable {
     }
 }
 
-final class PlaylistManager: @unchecked Sendable {
+actor PlaylistManager {
     static let shared = PlaylistManager()
 
     private let playlistsDir: URL
@@ -40,7 +40,7 @@ final class PlaylistManager: @unchecked Sendable {
             .appendingPathComponent("ScreenSpace").appendingPathComponent("playlists")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         self.playlistsDir = dir
-        self.playlists = loadAll()
+        self.playlists = Self.loadAll(from: dir)
     }
 
     func create(name: String) throws -> Playlist {
@@ -69,8 +69,8 @@ final class PlaylistManager: @unchecked Sendable {
         try data.write(to: url, options: .atomic)
     }
 
-    private func loadAll() -> [Playlist] {
-        guard let files = try? FileManager.default.contentsOfDirectory(at: playlistsDir, includingPropertiesForKeys: nil) else {
+    private static func loadAll(from dir: URL) -> [Playlist] {
+        guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else {
             return []
         }
         return files.compactMap { url -> Playlist? in

@@ -19,9 +19,11 @@ struct PlaylistsView: View {
                         .textFieldStyle(.roundedBorder)
                     Button("Create") {
                         guard !newPlaylistName.isEmpty else { return }
-                        if let playlist = try? appState.playlistManager.create(name: newPlaylistName) {
-                            playlists.append(playlist)
-                            newPlaylistName = ""
+                        Task {
+                            if let playlist = try? await appState.playlistManager.create(name: newPlaylistName) {
+                                playlists.append(playlist)
+                                newPlaylistName = ""
+                            }
                         }
                     }
                     .buttonStyle(.borderedProminent)
@@ -44,7 +46,7 @@ struct PlaylistsView: View {
             }
             .padding(.vertical)
         }
-        .onAppear { playlists = appState.playlistManager.playlists }
+        .task { playlists = await appState.playlistManager.playlists }
     }
 
     private func playlistCard(_ playlist: Playlist) -> some View {
@@ -70,16 +72,20 @@ struct PlaylistsView: View {
                     set: { newValue in
                         var updated = playlist
                         updated.shuffle = newValue
-                        try? appState.playlistManager.update(updated)
-                        playlists = appState.playlistManager.playlists
+                        Task {
+                            try? await appState.playlistManager.update(updated)
+                            playlists = await appState.playlistManager.playlists
+                        }
                     }
                 ))
                 .toggleStyle(.switch)
                 .labelsHidden()
 
                 Button(role: .destructive) {
-                    try? appState.playlistManager.delete(id: playlist.id)
-                    playlists = appState.playlistManager.playlists
+                    Task {
+                        try? await appState.playlistManager.delete(id: playlist.id)
+                        playlists = await appState.playlistManager.playlists
+                    }
                 } label: {
                     Image(systemName: "trash")
                 }
