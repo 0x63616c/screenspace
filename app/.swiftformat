@@ -1,0 +1,11 @@
+--indent 4
+--maxwidth 120
+--wraparguments before-first
+--wrapcollections before-first
+--commas inline
+--trimwhitespace always
+--semicolons never
+--importgrouping testable-bottom
+--redundanttype inferred
+--self remove
+--stripunusedargs closure-only
