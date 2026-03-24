@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -25,7 +24,6 @@ type seeder struct {
 	store        storage.Store
 	authService  *service.AuthService
 	videoService *service.VideoService
-	pexelsKey    string
 }
 
 func (s *seeder) run(ctx context.Context, adminEmail string) error {
@@ -70,7 +68,6 @@ func (s *seeder) run(ctx context.Context, adminEmail string) error {
 }
 
 func (s *seeder) seedUser(ctx context.Context, email, password, role string) (string, error) {
-	// Check if user already exists
 	var id string
 	err := s.db.QueryRowContext(ctx,
 		`SELECT id FROM users WHERE email = $1`, email,
@@ -111,7 +108,6 @@ func (s *seeder) seedWallpaper(ctx context.Context, v SeedVideo, uploaderID stri
 		return "", fmt.Errorf("check existing: %w", err)
 	}
 
-	// Create temp dir for this video
 	tmpDir, err := os.MkdirTemp("", "seed-*")
 	if err != nil {
 		return "", fmt.Errorf("create temp dir: %w", err)
@@ -120,16 +116,10 @@ func (s *seeder) seedWallpaper(ctx context.Context, v SeedVideo, uploaderID stri
 
 	videoPath := filepath.Join(tmpDir, "video.mp4")
 
-	// Get the video file
-	if s.pexelsKey != "" {
-		if err := s.downloadFromPexels(ctx, v.PexelsID, videoPath); err != nil {
-			log.Printf("  pexels download failed, generating video: %v", err)
-			if err := s.generateVideo(ctx, v, videoPath); err != nil {
-				return "", fmt.Errorf("generate video: %w", err)
-			}
-		}
-	} else {
-		if err := s.generateVideo(ctx, v, videoPath); err != nil {
+	// Download from Pexels CDN, fall back to generated video
+	if err := downloadFile(ctx, v.URL, videoPath); err != nil {
+		log.Printf("  download failed for %q, generating placeholder: %v", v.Title, err)
+		if err := generateVideo(ctx, v, videoPath); err != nil {
 			return "", fmt.Errorf("generate video: %w", err)
 		}
 	}
@@ -145,7 +135,7 @@ func (s *seeder) seedWallpaper(ctx context.Context, v SeedVideo, uploaderID stri
 		return "", fmt.Errorf("generate preview: %w", err)
 	}
 
-	// Get actual file info
+	// Probe actual video metadata
 	info, err := s.videoService.Probe(ctx, videoPath)
 	if err != nil {
 		return "", fmt.Errorf("probe video: %w", err)
@@ -169,34 +159,19 @@ func (s *seeder) seedWallpaper(ctx context.Context, v SeedVideo, uploaderID stri
 		return "", fmt.Errorf("upload preview: %w", err)
 	}
 
-	// Use probed values for width/height/duration, fall back to manifest
-	width := info.Width
-	height := info.Height
-	duration := info.Duration
-	fileSize := info.Size
+	resolution := fmt.Sprintf("%dx%d", info.Width, info.Height)
 	format := info.Format
-	resolution := fmt.Sprintf("%dx%d", width, height)
-
-	if width == 0 {
-		width = v.Width
-		height = v.Height
-		resolution = v.Resolution
-	}
-	if duration == 0 {
-		duration = v.Duration
-	}
 	if format == "" {
 		format = "h264"
 	}
 
-	// Insert wallpaper record
 	var insertedID string
 	err = s.db.QueryRowContext(ctx,
 		`INSERT INTO wallpapers (id, title, uploader_id, status, category, tags, resolution, width, height, duration, file_size, format, download_count, storage_key, thumbnail_key, preview_key)
 		 VALUES ($1, $2, $3, 'approved', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		 RETURNING id`,
 		wpID, v.Title, uploaderID, v.Category, pq.Array(v.Tags),
-		resolution, width, height, duration, fileSize, format,
+		resolution, info.Width, info.Height, info.Duration, info.Size, format,
 		v.Downloads, storageKey, thumbKey, previewKey,
 	).Scan(&insertedID)
 	if err != nil {
@@ -223,65 +198,6 @@ func (s *seeder) addFavorite(ctx context.Context, userID, wallpaperID string) er
 	return err
 }
 
-// downloadFromPexels fetches a video from the Pexels API by video ID.
-func (s *seeder) downloadFromPexels(ctx context.Context, pexelsID int, outputPath string) error {
-	url := fmt.Sprintf("https://api.pexels.com/videos/videos/%d", pexelsID)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", s.pexelsKey)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("pexels API request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("pexels API returned %d", resp.StatusCode)
-	}
-
-	var result struct {
-		VideoFiles []struct {
-			Quality string `json:"quality"`
-			Link    string `json:"link"`
-			Width   int    `json:"width"`
-			Height  int    `json:"height"`
-			FileType string `json:"file_type"`
-		} `json:"video_files"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return fmt.Errorf("decode pexels response: %w", err)
-	}
-
-	// Pick the best file: prefer HD (1920x1080) to keep downloads fast
-	var downloadURL string
-	for _, f := range result.VideoFiles {
-		if f.FileType != "video/mp4" {
-			continue
-		}
-		if f.Width == 1920 || f.Quality == "hd" {
-			downloadURL = f.Link
-			break
-		}
-	}
-	// Fall back to first mp4
-	if downloadURL == "" {
-		for _, f := range result.VideoFiles {
-			if f.FileType == "video/mp4" {
-				downloadURL = f.Link
-				break
-			}
-		}
-	}
-	if downloadURL == "" {
-		return fmt.Errorf("no suitable video file found for pexels ID %d", pexelsID)
-	}
-
-	return downloadFile(ctx, downloadURL, outputPath)
-}
-
 func downloadFile(ctx context.Context, url, outputPath string) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -294,7 +210,7 @@ func downloadFile(ctx context.Context, url, outputPath string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("download returned %d", resp.StatusCode)
+		return fmt.Errorf("download returned %d for %s", resp.StatusCode, url)
 	}
 
 	f, err := os.Create(outputPath)
@@ -307,28 +223,14 @@ func downloadFile(ctx context.Context, url, outputPath string) error {
 	return err
 }
 
-// generateVideo creates a placeholder video with ffmpeg using colored gradients
-// and text overlays. Used when PEXELS_API_KEY is not set.
-func (s *seeder) generateVideo(ctx context.Context, v SeedVideo, outputPath string) error {
-	// Map categories to color schemes (background gradient colors)
-	bg1, bg2 := categoryColors(v.Category)
-	dur := fmt.Sprintf("%.1f", v.Duration)
+// generateVideo creates a placeholder video with ffmpeg when CDN download fails.
+func generateVideo(ctx context.Context, v SeedVideo, outputPath string) error {
+	bg := categoryColor(v.Category)
 
-	// Generate a gradient video with category name and title overlay
-	filter := fmt.Sprintf(
-		"gradients=s=1920x1080:c0=%s:c1=%s:duration=%s:speed=1,"+
-			"drawtext=text='%s':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-40:shadowcolor=black:shadowx=2:shadowy=2,"+
-			"drawtext=text='%s':fontsize=28:fontcolor=white@0.7:x=(w-text_w)/2:y=(h-text_h)/2+30:shadowcolor=black:shadowx=1:shadowy=1",
-		bg1, bg2, dur,
-		strings.ReplaceAll(v.Title, "'", ""),
-		strings.ToUpper(v.Category),
-	)
-
-	// Try gradients filter first (ffmpeg 6+), fall back to color source
 	cmd := exec.CommandContext(ctx, "ffmpeg",
 		"-y",
 		"-f", "lavfi",
-		"-i", fmt.Sprintf("color=c=%s:s=1920x1080:d=%s", bg1, dur),
+		"-i", fmt.Sprintf("color=c=%s:s=1920x1080:d=10:r=24", bg),
 		"-vf", fmt.Sprintf(
 			"drawtext=text='%s':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-40:shadowcolor=black:shadowx=2:shadowy=2,"+
 				"drawtext=text='%s':fontsize=28:fontcolor=white@0.7:x=(w-text_w)/2:y=(h-text_h)/2+30:shadowcolor=black:shadowx=1:shadowy=1",
@@ -338,22 +240,19 @@ func (s *seeder) generateVideo(ctx context.Context, v SeedVideo, outputPath stri
 		"-c:v", "libx264",
 		"-preset", "ultrafast",
 		"-pix_fmt", "yuv420p",
-		"-t", dur,
 		outputPath,
 	)
-	_ = filter // gradients filter used in future ffmpeg versions
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		// drawtext may not be available, try without text
+		// drawtext may not be available, try without text overlay
 		cmd2 := exec.CommandContext(ctx, "ffmpeg",
 			"-y",
 			"-f", "lavfi",
-			"-i", fmt.Sprintf("color=c=%s:s=1920x1080:d=%s:r=24", bg1, dur),
+			"-i", fmt.Sprintf("color=c=%s:s=1920x1080:d=10:r=24", bg),
 			"-c:v", "libx264",
 			"-preset", "ultrafast",
 			"-pix_fmt", "yuv420p",
-			"-t", dur,
 			outputPath,
 		)
 		out2, err2 := cmd2.CombinedOutput()
@@ -366,19 +265,19 @@ func (s *seeder) generateVideo(ctx context.Context, v SeedVideo, outputPath stri
 	return nil
 }
 
-func categoryColors(category string) (string, string) {
+func categoryColor(category string) string {
 	switch category {
 	case "nature":
-		return "0x2D5016", "0x1A3A4A"
+		return "0x2D5016"
 	case "abstract":
-		return "0x6B1D7B", "0xC2185B"
+		return "0x6B1D7B"
 	case "space":
-		return "0x0D0D2B", "0x1A1A4E"
+		return "0x0D0D2B"
 	case "urban":
-		return "0x2C3E50", "0xE67E22"
+		return "0x2C3E50"
 	case "underwater":
-		return "0x004D6B", "0x00838F"
+		return "0x004D6B"
 	default:
-		return "0x333333", "0x666666"
+		return "0x333333"
 	}
 }

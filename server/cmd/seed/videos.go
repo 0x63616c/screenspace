@@ -2,138 +2,95 @@ package main
 
 // SeedVideo describes a wallpaper to seed into the dev environment.
 type SeedVideo struct {
-	PexelsID   int
+	URL        string   // Direct CDN download URL (HD 1080p)
 	Title      string
 	Category   string
 	Tags       []string
-	Resolution string
-	Width      int
-	Height     int
-	Duration   float64
-	Downloads  int64 // fake download count for Popular ordering
+	Downloads  int64    // fake download count for Popular ordering
 }
 
-// videos is the manifest of wallpapers to seed. When PEXELS_API_KEY is set,
-// the seed script fetches real videos from the Pexels API using PexelsID.
-// Otherwise it generates placeholder videos with ffmpeg.
+// videos is the manifest of wallpapers to seed. Uses Pexels CDN URLs
+// for HD (1920x1080) versions which are typically 5-15MB each.
+// The actual resolution, duration, and file size are probed from the
+// downloaded file via ffprobe.
 var videos = []SeedVideo{
 	// Nature (3)
 	{
-		PexelsID:   857251,
-		Title:      "Ocean Waves at Sunset",
-		Category:   "nature",
-		Tags:       []string{"ocean", "waves", "sunset", "water"},
-		Resolution: "3840x2160",
-		Width:      3840,
-		Height:     2160,
-		Duration:   10.0,
-		Downloads:  342,
+		URL:       "https://videos.pexels.com/video-files/857251/857251-hd_1620_1080_25fps.mp4",
+		Title:     "Ocean Waves at Sunset",
+		Category:  "nature",
+		Tags:      []string{"ocean", "waves", "sunset", "water"},
+		Downloads: 342,
 	},
 	{
-		PexelsID:   2491284,
-		Title:      "Misty Mountain Forest",
-		Category:   "nature",
-		Tags:       []string{"forest", "mountains", "mist", "trees"},
-		Resolution: "3840x2160",
-		Width:      3840,
-		Height:     2160,
-		Duration:   12.0,
-		Downloads:  287,
+		URL:       "https://videos.pexels.com/video-files/2491284/2491284-hd_2048_1080_24fps.mp4",
+		Title:     "Misty Mountain Forest",
+		Category:  "nature",
+		Tags:      []string{"forest", "mountains", "mist", "trees"},
+		Downloads: 287,
 	},
 	{
-		PexelsID:   1448735,
-		Title:      "Autumn Leaves Falling",
-		Category:   "nature",
-		Tags:       []string{"autumn", "leaves", "fall", "seasonal"},
-		Resolution: "1920x1080",
-		Width:      1920,
-		Height:     1080,
-		Duration:   8.0,
-		Downloads:  198,
+		URL:       "https://videos.pexels.com/video-files/1448735/1448735-hd_2048_1080_24fps.mp4",
+		Title:     "Autumn Leaves Falling",
+		Category:  "nature",
+		Tags:      []string{"autumn", "leaves", "fall", "seasonal"},
+		Downloads: 198,
 	},
 
 	// Abstract (2)
 	{
-		PexelsID:   3141210,
-		Title:      "Flowing Ink in Water",
-		Category:   "abstract",
-		Tags:       []string{"ink", "water", "fluid", "colorful"},
-		Resolution: "3840x2160",
-		Width:      3840,
-		Height:     2160,
-		Duration:   10.0,
-		Downloads:  456,
+		URL:       "https://videos.pexels.com/video-files/3141210/3141210-hd_1920_1080_25fps.mp4",
+		Title:     "Flowing Ink in Water",
+		Category:  "abstract",
+		Tags:      []string{"ink", "water", "fluid", "colorful"},
+		Downloads: 456,
 	},
 	{
-		PexelsID:   2795167,
-		Title:      "Neon Light Trails",
-		Category:   "abstract",
-		Tags:       []string{"neon", "lights", "trails", "glow"},
-		Resolution: "1920x1080",
-		Width:      1920,
-		Height:     1080,
-		Duration:   8.0,
-		Downloads:  523,
+		URL:       "https://videos.pexels.com/video-files/3129671/3129671-hd_1920_1080_30fps.mp4",
+		Title:     "Abstract Light Geometry",
+		Category:  "abstract",
+		Tags:      []string{"geometry", "lights", "digital", "lines"},
+		Downloads: 523,
 	},
 
 	// Space (2)
 	{
-		PexelsID:   1851190,
-		Title:      "Milky Way Timelapse",
-		Category:   "space",
-		Tags:       []string{"milky way", "stars", "night sky", "timelapse"},
-		Resolution: "3840x2160",
-		Width:      3840,
-		Height:     2160,
-		Duration:   15.0,
-		Downloads:  612,
+		URL:       "https://videos.pexels.com/video-files/1851190/1851190-hd_1920_1080_25fps.mp4",
+		Title:     "Milky Way Timelapse",
+		Category:  "space",
+		Tags:      []string{"milky way", "stars", "night sky", "timelapse"},
+		Downloads: 612,
 	},
 	{
-		PexelsID:   1722591,
-		Title:      "Northern Lights Aurora",
-		Category:   "space",
-		Tags:       []string{"aurora", "northern lights", "sky", "polar"},
-		Resolution: "1920x1080",
-		Width:      1920,
-		Height:     1080,
-		Duration:   12.0,
-		Downloads:  389,
+		URL:       "https://videos.pexels.com/video-files/856356/856356-hd_1920_1080_25fps.mp4",
+		Title:     "Earth From Space",
+		Category:  "space",
+		Tags:      []string{"earth", "space", "rotation", "planet"},
+		Downloads: 389,
 	},
 
 	// Urban (2)
 	{
-		PexelsID:   1721294,
-		Title:      "City Skyline at Night",
-		Category:   "urban",
-		Tags:       []string{"city", "skyline", "night", "buildings"},
-		Resolution: "3840x2160",
-		Width:      3840,
-		Height:     2160,
-		Duration:   10.0,
-		Downloads:  275,
+		URL:       "https://videos.pexels.com/video-files/1721294/1721294-hd_1920_1080_25fps.mp4",
+		Title:     "City Skyline at Dusk",
+		Category:  "urban",
+		Tags:      []string{"city", "skyline", "dusk", "buildings"},
+		Downloads: 275,
 	},
 	{
-		PexelsID:   3048163,
-		Title:      "Rain on City Streets",
-		Category:   "urban",
-		Tags:       []string{"rain", "city", "streets", "reflections"},
-		Resolution: "1920x1080",
-		Width:      1920,
-		Height:     1080,
-		Duration:   8.0,
-		Downloads:  441,
+		URL:       "https://videos.pexels.com/video-files/1826896/1826896-hd_1920_1080_24fps.mp4",
+		Title:     "Aerial City View",
+		Category:  "urban",
+		Tags:      []string{"aerial", "city", "drone", "urban"},
+		Downloads: 441,
 	},
 
 	// Underwater (1)
 	{
-		PexelsID:   855029,
-		Title:      "Coral Reef Fish",
-		Category:   "underwater",
-		Tags:       []string{"coral", "reef", "fish", "underwater", "ocean"},
-		Resolution: "1920x1080",
-		Width:      1920,
-		Height:     1080,
-		Duration:   10.0,
-		Downloads:  167,
+		URL:       "https://videos.pexels.com/video-files/855029/855029-hd_1920_1080_30fps.mp4",
+		Title:     "Coral Reef Fish",
+		Category:  "underwater",
+		Tags:      []string{"coral", "reef", "fish", "underwater", "ocean"},
+		Downloads: 167,
 	},
 }

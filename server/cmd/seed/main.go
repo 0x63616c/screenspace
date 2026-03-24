@@ -29,7 +29,6 @@ func main() {
 		log.Fatal("JWT_SECRET is required")
 	}
 	adminEmail := envOr("ADMIN_EMAIL", "admin@screenspace.dev")
-	pexelsKey := os.Getenv("PEXELS_API_KEY")
 
 	// Database
 	db, err := sql.Open("postgres", databaseURL)
@@ -51,18 +50,13 @@ func main() {
 		log.Printf("warning: could not ensure bucket: %v", err)
 	}
 
-	if pexelsKey != "" {
-		log.Println("PEXELS_API_KEY set, will download real videos from Pexels")
-	} else {
-		log.Println("no PEXELS_API_KEY, generating placeholder videos with ffmpeg")
-	}
+	log.Printf("seeding %d wallpapers from Pexels CDN (ffmpeg fallback if download fails)", len(videos))
 
 	s := &seeder{
 		db:           db,
 		store:        store,
 		authService:  service.NewAuthService(jwtSecret),
 		videoService: service.NewVideoService(),
-		pexelsKey:    pexelsKey,
 	}
 
 	ctx := context.Background()
@@ -79,4 +73,3 @@ func envOr(key, fallback string) string {
 	}
 	return fallback
 }
-
