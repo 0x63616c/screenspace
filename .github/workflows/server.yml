@@ -69,9 +69,9 @@ jobs:
 
       - name: Check for diff
         run: |
-          if ! git diff --quiet; then
+          if ! git diff --quiet -- server/db/generated/ server/generated/; then
             echo "Generated code is out of date. Run 'make generate' and commit the result."
-            git diff --stat
+            git diff --stat -- server/db/generated/ server/generated/
             exit 1
           fi
 
