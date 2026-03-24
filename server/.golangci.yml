@@ -114,8 +114,14 @@ linters:
         linters:
           - gosec
           - perfsprint
+      # Mock files: implement interfaces, comments are redundant
+      - path: "mock_"
+        linters:
+          - revive
       # Test files: relax some rules
       - path: "_test\\.go"
         linters:
           - gosec
           - errcheck
+          - revive
+          - perfsprint
