@@ -17,9 +17,6 @@ final class AppState {
     let lockScreen: LockScreenManager
     let configManager: ConfigManager
 
-    /// Keep APIClient for backward compat during migration
-    let api: APIClient
-
     var currentUser: UserInfo?
     var isLoggedIn: Bool {
         currentUser != nil
@@ -59,7 +56,6 @@ final class AppState {
         self.cache = cache ?? LiveCache()
         self.wallpaperProvider = wallpaperProvider ?? LiveWallpaperProvider()
         apiService = api ?? APIService(client: apiClient)
-        self.api = apiClient
         self.configManager = cm
         lockScreen = LockScreenManager()
         self.engine = engine ?? WallpaperEngine(configManager: cm)
