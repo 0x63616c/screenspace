@@ -29,11 +29,16 @@ struct Playlist: Codable, Identifiable, Equatable {
     }
 }
 
-actor PlaylistManager {
+@MainActor
+final class PlaylistManager: PlaylistManaging {
     static let shared = PlaylistManager()
 
     private let playlistsDir: URL
-    private(set) var playlists: [Playlist] = []
+    private var _playlists: [Playlist] = []
+
+    nonisolated var playlists: [Playlist] {
+        MainActor.assumeIsolated { _playlists }
+    }
 
     init(directory: URL? = nil) {
         let dir: URL
@@ -49,26 +54,32 @@ actor PlaylistManager {
         }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         playlistsDir = dir
-        playlists = Self.loadAll(from: dir)
+        _playlists = Self.loadAll(from: dir)
     }
 
-    func create(name: String) throws -> Playlist {
-        let playlist = Playlist.create(name: name)
-        try save(playlist)
-        playlists.append(playlist)
-        return playlist
+    nonisolated func create(name: String) throws -> Playlist {
+        try MainActor.assumeIsolated {
+            let playlist = Playlist.create(name: name)
+            try save(playlist)
+            _playlists.append(playlist)
+            return playlist
+        }
     }
 
-    func delete(id: String) throws {
-        let url = playlistsDir.appendingPathComponent("\(id).json")
-        try? FileManager.default.removeItem(at: url)
-        playlists.removeAll { $0.id == id }
+    nonisolated func delete(id: String) throws {
+        try MainActor.assumeIsolated {
+            let url = playlistsDir.appendingPathComponent("\(id).json")
+            try? FileManager.default.removeItem(at: url)
+            _playlists.removeAll { $0.id == id }
+        }
     }
 
-    func update(_ playlist: Playlist) throws {
-        try save(playlist)
-        if let idx = playlists.firstIndex(where: { $0.id == playlist.id }) {
-            playlists[idx] = playlist
+    nonisolated func update(_ playlist: Playlist) throws {
+        try MainActor.assumeIsolated {
+            try save(playlist)
+            if let idx = _playlists.firstIndex(where: { $0.id == playlist.id }) {
+                _playlists[idx] = playlist
+            }
         }
     }
 
