@@ -73,8 +73,7 @@ final class UploadViewModel {
             var request = URLRequest(url: uploadURL)
             request.httpMethod = "PUT"
             request.setValue("video/mp4", forHTTPHeaderField: "Content-Type")
-            let fileData = try Data(contentsOf: fileURL)
-            let (_, response) = try await URLSession.shared.upload(for: request, from: fileData)
+            let (_, response) = try await URLSession.shared.upload(for: request, fromFile: fileURL)
             guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode) else {
                 throw APIError.httpError(status: 0)
             }
