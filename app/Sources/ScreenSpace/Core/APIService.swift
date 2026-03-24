@@ -38,17 +38,29 @@ final class APIService: APIProviding {
 
     func popularWallpapers(limit: Int, offset: Int) async throws -> PagedWallpapers {
         let response = try await client.popularWallpapers(limit: limit, offset: offset)
-        return mapWallpaperList(response)
+        return mapWallpaperList(response, limit: limit, offset: offset)
     }
 
     func recentWallpapers(limit: Int, offset: Int) async throws -> PagedWallpapers {
         let response = try await client.recentWallpapers(limit: limit, offset: offset)
-        return mapWallpaperList(response)
+        return mapWallpaperList(response, limit: limit, offset: offset)
     }
 
-    func listWallpapers(category: Category?, query: String?, sort: SortOrder, limit: Int, offset: Int) async throws -> PagedWallpapers {
-        let response = try await client.listWallpapers(sort: sort, category: category, query: query, limit: limit, offset: offset)
-        return mapWallpaperList(response)
+    func listWallpapers(
+        category: Category?,
+        query: String?,
+        sort: SortOrder,
+        limit: Int,
+        offset: Int
+    ) async throws -> PagedWallpapers {
+        let response = try await client.listWallpapers(
+            sort: sort,
+            category: category,
+            query: query,
+            limit: limit,
+            offset: offset
+        )
+        return mapWallpaperList(response, limit: limit, offset: offset)
     }
 
     func getWallpaper(id: String) async throws -> WallpaperDetail {
@@ -69,7 +81,7 @@ final class APIService: APIProviding {
 
     func listFavorites(limit: Int, offset: Int) async throws -> PagedWallpapers {
         let response = try await client.listFavorites(limit: limit, offset: offset)
-        return mapWallpaperList(response)
+        return mapWallpaperList(response, limit: limit, offset: offset)
     }
 
     // MARK: - Reports
@@ -93,7 +105,7 @@ final class APIService: APIProviding {
 
     func listQueue(limit: Int, offset: Int) async throws -> PagedWallpapers {
         let response = try await client.listQueue(limit: limit, offset: offset)
-        return mapWallpaperList(response)
+        return mapWallpaperList(response, limit: limit, offset: offset)
     }
 
     func approveWallpaper(id: String) async throws {
@@ -106,7 +118,7 @@ final class APIService: APIProviding {
 
     func listAdminWallpapers(status: WallpaperStatus?, limit: Int, offset: Int) async throws -> PagedWallpapers {
         let response = try await client.listAllWallpapers(status: status, limit: limit, offset: offset)
-        return mapWallpaperList(response)
+        return mapWallpaperList(response, limit: limit, offset: offset)
     }
 
     func editWallpaper(id: String, title: String?, category: Category?, tags: [String]?) async throws {
@@ -141,7 +153,13 @@ final class APIService: APIProviding {
         let response = try await client.listReports(limit: limit, offset: offset)
         return PagedReports(
             items: response.reports.map {
-                ReportInfo(id: $0.id, wallpaperID: $0.wallpaperID, reporterID: $0.reporterID, reason: $0.reason, createdAt: $0.createdAt)
+                ReportInfo(
+                    id: $0.id,
+                    wallpaperID: $0.wallpaperID,
+                    reporterID: $0.reporterID,
+                    reason: $0.reason,
+                    createdAt: $0.createdAt
+                )
             },
             total: response.total,
             limit: limit,
@@ -155,7 +173,7 @@ final class APIService: APIProviding {
 
     // MARK: - Private Mapping
 
-    private func mapWallpaperList(_ response: WallpaperListResponse) -> PagedWallpapers {
+    private func mapWallpaperList(_ response: WallpaperListResponse, limit: Int, offset: Int) -> PagedWallpapers {
         PagedWallpapers(
             items: response.wallpapers.map { wp in
                 WallpaperCardData(
@@ -168,8 +186,8 @@ final class APIService: APIProviding {
                 )
             },
             total: response.total,
-            limit: 20,
-            offset: 0
+            limit: limit,
+            offset: offset
         )
     }
 
