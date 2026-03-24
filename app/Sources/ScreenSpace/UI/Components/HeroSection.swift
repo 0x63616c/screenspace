@@ -7,24 +7,34 @@ struct HeroSection: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            // Background gradient (will be replaced with video preview)
-            RoundedRectangle(cornerRadius: 20)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.1, green: 0.15, blue: 0.3),
-                            Color(red: 0.15, green: 0.1, blue: 0.25)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(height: 340)
-                .overlay {
-                    // Noise texture overlay for depth
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(.ultraThinMaterial.opacity(0.1))
+            // Thumbnail background with gradient fallback
+            if let thumbnailURL = wallpaper?.thumbnailURL {
+                AsyncImage(url: thumbnailURL) { phase in
+                    switch phase {
+                    case let .success(image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(height: 340)
+                            .clipped()
+                    default:
+                        heroGradientFallback
+                    }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .frame(height: 340)
+            } else {
+                heroGradientFallback
+            }
+
+            // Scrim so text is readable over bright thumbnails
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.7)],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .frame(height: 340)
 
             // Content overlay - glass card floating at bottom
             VStack(alignment: .leading, spacing: Spacing.md) {
@@ -67,5 +77,20 @@ struct HeroSection: View {
             }
             .padding(Spacing.xl)
         }
+    }
+
+    private var heroGradientFallback: some View {
+        RoundedRectangle(cornerRadius: 20)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.1, green: 0.15, blue: 0.3),
+                        Color(red: 0.15, green: 0.1, blue: 0.25)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .frame(height: 340)
     }
 }
