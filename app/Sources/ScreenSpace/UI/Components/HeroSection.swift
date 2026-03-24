@@ -2,8 +2,8 @@ import SwiftUI
 
 struct HeroSection: View {
     let wallpaper: WallpaperCardData?
-    var onViewWallpaper: (() -> Void)? = nil
-    var onFavorite: (() -> Void)? = nil
+    var onViewWallpaper: (() -> Void)?
+    var onFavorite: (() -> Void)?
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -49,16 +49,16 @@ struct HeroSection: View {
                 }
 
                 HStack(spacing: Spacing.md) {
-                    Button(action: { onViewWallpaper?() }) {
+                    Button(action: { onViewWallpaper?() }, label: {
                         Label("Set as Wallpaper", systemImage: "photo.on.rectangle")
-                    }
+                    })
                     .buttonStyle(.borderedProminent)
                     .controlSize(.regular)
                     .accessibilityLabel("Set featured wallpaper as desktop wallpaper")
 
-                    Button(action: { onFavorite?() }) {
+                    Button(action: { onFavorite?() }, label: {
                         Image(systemName: "heart")
-                    }
+                    })
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
                     .accessibilityLabel("Add featured wallpaper to favorites")
