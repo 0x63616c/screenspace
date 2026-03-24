@@ -2,6 +2,13 @@
 # Pre-commit hooks for Go (server/) and Swift (app/)
 # Install: lefthook install
 
+output:
+  - summary
+  - skips
+  - success
+  - failure
+  - execution_info
+
 pre-commit:
   parallel: true
   commands:
