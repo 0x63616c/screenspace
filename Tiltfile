@@ -9,6 +9,24 @@ dc_resource('postgres', labels=['infra'])
 dc_resource('minio', labels=['infra'])
 dc_resource('minio-init', labels=['infra'])
 
+# Seed dev data: users, wallpapers, favorites
+local_resource(
+    'seed',
+    cmd='cd server && go run ./cmd/seed',
+    env={
+        'DATABASE_URL': 'postgres://screenspace:devpassword@localhost:5432/screenspace?sslmode=disable',
+        'S3_ENDPOINT': 'http://localhost:9000',
+        'S3_BUCKET': 'screenspace',
+        'S3_ACCESS_KEY': 'minioadmin',
+        'S3_SECRET_KEY': 'minioadmin',
+        'JWT_SECRET': 'dev-secret-do-not-use-in-production',
+        'ADMIN_EMAIL': 'admin@screenspace.dev',
+    },
+    resource_deps=['postgres', 'minio-init'],
+    auto_init=True,
+    labels=['infra'],
+)
+
 # Go API server - built and run locally with live reload
 local_resource(
     'server',
@@ -25,7 +43,7 @@ local_resource(
         'ADMIN_EMAIL': 'admin@screenspace.dev',
         'PORT': '8080',
     },
-    resource_deps=['postgres', 'minio-init'],
+    resource_deps=['postgres', 'minio-init', 'seed'],
     labels=['backend'],
     readiness_probe=probe(http_get=http_get_action(port=8080, path='/health')),
 )
@@ -99,7 +117,8 @@ print("""
   MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
   Postgres:      localhost:5432 (screenspace/devpassword)
 
-  Admin email:   admin@screenspace.dev
+  Admin:         admin@screenspace.dev / password
+  User:          user@screenspace.dev / password
 
   To run the macOS app:
     Click 'app-run' in the Tilt UI, or:
