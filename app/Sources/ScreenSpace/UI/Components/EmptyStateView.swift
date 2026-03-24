@@ -13,7 +13,7 @@ struct EmptyStateView: View {
             Text(title)
                 .foregroundStyle(.secondary)
             Text(subtitle)
-                .font(.caption)
+                .font(Typography.meta)
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity)
