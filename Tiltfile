@@ -45,7 +45,7 @@ local_resource(
     },
     resource_deps=['postgres', 'minio-init', 'seed'],
     labels=['backend'],
-    readiness_probe=probe(http_get=http_get_action(port=8080, path='/health')),
+    readiness_probe=probe(http_get=http_get_action(port=8080, path='/api/v1/health')),
 )
 
 # Go tests
