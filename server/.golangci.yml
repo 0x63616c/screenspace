@@ -102,6 +102,18 @@ linters:
 
   exclusions:
     rules:
+      # Generated files: never hand-edit, skip linting
+      - path: "db/generated/"
+        linters:
+          - revive
+      - path: "generated/"
+        linters:
+          - revive
+      # Seed tool: dev-only, relax security linting
+      - path: "cmd/seed/"
+        linters:
+          - gosec
+          - perfsprint
       # Test files: relax some rules
       - path: "_test\\.go"
         linters:

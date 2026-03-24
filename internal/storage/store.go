@@ -6,12 +6,14 @@ import (
 	"time"
 )
 
+// ObjectInfo describes a stored object.
 type ObjectInfo struct {
 	Key         string
 	Size        int64
 	ContentType string
 }
 
+// Store abstracts object storage operations.
 type Store interface {
 	Put(ctx context.Context, key string, reader io.Reader, contentType string) error
 	Get(ctx context.Context, key string) (io.ReadCloser, error)

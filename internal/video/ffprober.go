@@ -1,4 +1,4 @@
-package service
+package video
 
 import (
 	"context"
@@ -9,18 +9,12 @@ import (
 	"strings"
 )
 
-type VideoInfo struct {
-	Width    int
-	Height   int
-	Duration float64
-	Format   string
-	Size     int64
-}
+// FFProber implements Prober using ffprobe and ffmpeg.
+type FFProber struct{}
 
-type VideoService struct{}
-
-func NewVideoService() *VideoService {
-	return &VideoService{}
+// NewFFProber creates a new FFProber.
+func NewFFProber() *FFProber {
+	return &FFProber{}
 }
 
 type ffprobeOutput struct {
@@ -29,8 +23,8 @@ type ffprobeOutput struct {
 }
 
 type ffprobeStream struct {
-	Width    int    `json:"width"`
-	Height   int    `json:"height"`
+	Width     int    `json:"width"`
+	Height    int    `json:"height"`
 	CodecName string `json:"codec_name"`
 }
 
@@ -39,8 +33,9 @@ type ffprobeFormat struct {
 	Size     string `json:"size"`
 }
 
-func (v *VideoService) Probe(ctx context.Context, path string) (*VideoInfo, error) {
-	cmd := exec.CommandContext(ctx, "ffprobe",
+// Probe runs ffprobe on the given path and returns video metadata.
+func (p *FFProber) Probe(ctx context.Context, path string) (*ProbeResult, error) {
+	cmd := exec.CommandContext(ctx, "ffprobe", //nolint:gosec // path is internal, not user-controlled
 		"-v", "quiet",
 		"-print_format", "json",
 		"-show_streams",
@@ -57,7 +52,7 @@ func (v *VideoService) Probe(ctx context.Context, path string) (*VideoInfo, erro
 		return nil, fmt.Errorf("parse ffprobe output: %w", err)
 	}
 
-	info := &VideoInfo{}
+	info := &ProbeResult{}
 
 	for _, s := range probe.Streams {
 		if s.Width > 0 && s.Height > 0 {
@@ -85,8 +80,9 @@ func (v *VideoService) Probe(ctx context.Context, path string) (*VideoInfo, erro
 	return info, nil
 }
 
-func (v *VideoService) GenerateThumbnail(ctx context.Context, inputPath, outputPath string) error {
-	cmd := exec.CommandContext(ctx, "ffmpeg",
+// GenerateThumbnail extracts a single frame as a JPEG thumbnail.
+func (p *FFProber) GenerateThumbnail(ctx context.Context, inputPath, outputPath string) error {
+	cmd := exec.CommandContext(ctx, "ffmpeg", //nolint:gosec // paths are internal
 		"-y",
 		"-i", inputPath,
 		"-ss", "2",
@@ -100,8 +96,9 @@ func (v *VideoService) GenerateThumbnail(ctx context.Context, inputPath, outputP
 	return nil
 }
 
-func (v *VideoService) GeneratePreview(ctx context.Context, inputPath, outputPath string) error {
-	cmd := exec.CommandContext(ctx, "ffmpeg",
+// GeneratePreview creates a 10-second scaled-down preview clip.
+func (p *FFProber) GeneratePreview(ctx context.Context, inputPath, outputPath string) error {
+	cmd := exec.CommandContext(ctx, "ffmpeg", //nolint:gosec // paths are internal
 		"-y",
 		"-i", inputPath,
 		"-t", "10",

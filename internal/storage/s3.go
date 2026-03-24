@@ -11,6 +11,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
+var _ Store = (*S3Store)(nil)
+
+// S3Store implements Store backed by S3-compatible object storage.
 type S3Store struct {
 	client   *s3.Client
 	presign  *s3.PresignClient
@@ -18,6 +21,7 @@ type S3Store struct {
 	endpoint string
 }
 
+// NewS3Store creates a new S3-backed Store.
 func NewS3Store(endpoint, bucket, accessKey, secretKey string) (*S3Store, error) {
 	cfg, err := awsconfig.LoadDefaultConfig(context.Background(),
 		awsconfig.WithRegion("us-east-1"),
@@ -42,6 +46,7 @@ func NewS3Store(endpoint, bucket, accessKey, secretKey string) (*S3Store, error)
 	}, nil
 }
 
+// EnsureBucket creates the bucket if it does not exist.
 func (s *S3Store) EnsureBucket(ctx context.Context) error {
 	_, err := s.client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(s.bucket),
@@ -59,6 +64,7 @@ func (s *S3Store) EnsureBucket(ctx context.Context) error {
 	return nil
 }
 
+// Put uploads an object to S3.
 func (s *S3Store) Put(ctx context.Context, key string, reader io.Reader, contentType string) error {
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
@@ -69,6 +75,7 @@ func (s *S3Store) Put(ctx context.Context, key string, reader io.Reader, content
 	return err
 }
 
+// Get downloads an object from S3.
 func (s *S3Store) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
@@ -80,6 +87,7 @@ func (s *S3Store) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	return out.Body, nil
 }
 
+// Delete removes an object from S3.
 func (s *S3Store) Delete(ctx context.Context, key string) error {
 	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(s.bucket),
@@ -88,6 +96,7 @@ func (s *S3Store) Delete(ctx context.Context, key string) error {
 	return err
 }
 
+// Stat returns metadata about an object.
 func (s *S3Store) Stat(ctx context.Context, key string) (*ObjectInfo, error) {
 	out, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(s.bucket),
@@ -109,6 +118,7 @@ func (s *S3Store) Stat(ctx context.Context, key string) (*ObjectInfo, error) {
 	return info, nil
 }
 
+// List returns object keys matching the prefix.
 func (s *S3Store) List(ctx context.Context, prefix string) ([]string, error) {
 	out, err := s.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(s.bucket),
@@ -127,6 +137,7 @@ func (s *S3Store) List(ctx context.Context, prefix string) ([]string, error) {
 	return keys, nil
 }
 
+// PreSignedURL generates a presigned download URL.
 func (s *S3Store) PreSignedURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
 	out, err := s.presign.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
@@ -138,6 +149,7 @@ func (s *S3Store) PreSignedURL(ctx context.Context, key string, expiry time.Dura
 	return out.URL, nil
 }
 
+// PreSignedUploadURL generates a presigned upload URL.
 func (s *S3Store) PreSignedUploadURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
 	out, err := s.presign.PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucket),
