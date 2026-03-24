@@ -4,9 +4,11 @@ import SwiftUI
 @MainActor
 final class GalleryWindowController {
     private var window: NSWindow?
+    private var closeObserver: Any?
 
     func show(appState: AppState) {
         if let window = window {
+            NSApp.setActivationPolicy(.regular)
             window.makeKeyAndOrderFront(nil)
             NSApp.activate()
             return
@@ -26,9 +28,20 @@ final class GalleryWindowController {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.contentView = hostingView
-        window.makeKeyAndOrderFront(nil)
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 900, height: 600)
+
+        closeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            NSApp.setActivationPolicy(.accessory)
+            self?.window = nil
+        }
+
+        NSApp.setActivationPolicy(.regular)
+        window.makeKeyAndOrderFront(nil)
         NSApp.activate()
 
         self.window = window
