@@ -81,7 +81,7 @@ struct DetailViewModelTests {
     @Test("formattedSize formats bytes to MB")
     func formattedSizeFormatsMB() {
         let vm = makeVM()
-        #expect(vm.formattedSize == "85MB")
+        #expect(vm.formattedSize == "85.0 MB")
     }
 
     @Test("formattedDuration formats seconds")

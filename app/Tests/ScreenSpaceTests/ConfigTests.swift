@@ -35,27 +35,28 @@ final class ConfigTests: XCTestCase {
         XCTAssertFalse(reloaded.pauseOnBattery)
     }
 
-    func testPlaylistManagerCRUD() async throws {
+    @MainActor
+    func testPlaylistManagerCRUD() throws {
         let tmpDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: tmpDir) }
 
         let manager = PlaylistManager(directory: tmpDir)
-        let initial = await manager.playlists
+        let initial = manager.playlists
         XCTAssertTrue(initial.isEmpty)
 
-        let playlist = try await manager.create(name: "Test")
-        let afterCreate = await manager.playlists
+        let playlist = try manager.create(name: "Test")
+        let afterCreate = manager.playlists
         XCTAssertEqual(afterCreate.count, 1)
         XCTAssertEqual(playlist.name, "Test")
 
         var updated = playlist
         updated.name = "Updated"
-        try await manager.update(updated)
-        let afterUpdate = await manager.playlists
+        try manager.update(updated)
+        let afterUpdate = manager.playlists
         XCTAssertEqual(afterUpdate.first?.name, "Updated")
 
-        try await manager.delete(id: playlist.id)
-        let afterDelete = await manager.playlists
+        try manager.delete(id: playlist.id)
+        let afterDelete = manager.playlists
         XCTAssertTrue(afterDelete.isEmpty)
     }
 }
