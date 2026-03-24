@@ -90,6 +90,12 @@ private struct ExploreContentView: View {
                         }
                     }
                     .padding(.horizontal)
+                } else if viewModel.selectedCategory != nil || !viewModel.searchQuery.isEmpty {
+                    EmptyStateView(
+                        icon: "magnifyingglass",
+                        title: "No results found",
+                        subtitle: "Try a different search term or category."
+                    )
                 }
             }
             .padding(.vertical)
@@ -98,5 +104,9 @@ private struct ExploreContentView: View {
         .sheet(item: $viewModel.selectedDetail) { detail in
             DetailView(wallpaper: detail)
         }
+        .errorAlert(message: Binding(
+            get: { viewModel.error },
+            set: { viewModel.error = $0 }
+        ))
     }
 }
