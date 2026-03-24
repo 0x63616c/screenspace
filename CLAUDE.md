@@ -5,7 +5,7 @@ macOS menu bar app for live video wallpapers with a community server for sharing
 ## Architecture
 
 - **App:** Swift 6 / SwiftUI, macOS 15+ (targeting macOS 26+ in future)
-- **Server:** Go 1.23, PostgreSQL, S3-compatible storage
+- **Server:** Go 1.26, PostgreSQL, S3-compatible storage
 - **Distribution:** Direct (Sparkle auto-update), not Mac App Store
 - **Dev environment:** Tilt (docker-compose for Postgres + MinIO + server)
 
