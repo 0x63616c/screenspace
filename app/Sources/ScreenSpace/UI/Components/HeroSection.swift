@@ -27,7 +27,7 @@ struct HeroSection: View {
                 }
 
             // Content overlay - glass card floating at bottom
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: Spacing.md) {
                 Text("FEATURED")
                     .font(Typography.meta)
                     .fontWeight(.heavy)
@@ -35,12 +35,12 @@ struct HeroSection: View {
                     .foregroundStyle(.white.opacity(0.6))
 
                 Text(wallpaper?.title ?? "No wallpapers yet")
-                    .font(.title.bold())
+                    .font(Typography.sectionTitle)
                     .foregroundStyle(.white)
                     .lineLimit(2)
 
                 if let wp = wallpaper {
-                    HStack(spacing: 12) {
+                    HStack(spacing: Spacing.md) {
                         ResolutionBadge(width: wp.width, height: wp.height)
                         Text(wp.durationLabel)
                             .font(Typography.meta)
@@ -48,7 +48,7 @@ struct HeroSection: View {
                     }
                 }
 
-                HStack(spacing: 10) {
+                HStack(spacing: Spacing.md) {
                     Button(action: { onViewWallpaper?() }) {
                         Label("Set as Wallpaper", systemImage: "photo.on.rectangle")
                     }
@@ -63,9 +63,9 @@ struct HeroSection: View {
                     .controlSize(.regular)
                     .accessibilityLabel("Add featured wallpaper to favorites")
                 }
-                .padding(.top, 4)
+                .padding(.top, Spacing.xs)
             }
-            .padding(24)
+            .padding(Spacing.xl)
         }
     }
 }
