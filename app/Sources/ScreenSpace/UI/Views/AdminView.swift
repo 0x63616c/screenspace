@@ -1,40 +1,47 @@
 import SwiftUI
 
 struct AdminView: View {
-    enum AdminTab: String, CaseIterable {
-        case queue = "Queue"
-        case content = "Content"
-        case users = "Users"
-        case reports = "Reports"
-    }
-
-    @State private var selectedTab: AdminTab = .queue
-    @State private var pendingWallpapers: [WallpaperResponse] = []
-    @State private var users: [UserResponse] = []
-    @State private var reports: [ReportResponse] = []
-    @State private var isLoading = false
-    @State private var errorMessage: String?
     @Environment(AppState.self) private var appState
+    @State private var viewModel: AdminViewModel?
+
+    var body: some View {
+        Group {
+            if let viewModel {
+                AdminContentView(viewModel: viewModel)
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            if viewModel == nil {
+                viewModel = AdminViewModel(api: appState.apiService, eventLog: appState.eventLog)
+            }
+        }
+    }
+}
+
+private struct AdminContentView: View {
+    @Bindable var viewModel: AdminViewModel
 
     var body: some View {
         VStack(spacing: 0) {
             // Tab bar
             HStack(spacing: 0) {
-                ForEach(AdminTab.allCases, id: \.self) { tab in
-                    Button(action: { selectedTab = tab }, label: {
+                ForEach(AdminViewModel.AdminTab.allCases, id: \.self) { tab in
+                    Button(action: { viewModel.selectedTab = tab }, label: {
                         Text(tab.rawValue)
                             .font(Typography.cardTitle)
-                            .fontWeight(selectedTab == tab ? .semibold : .regular)
-                            .foregroundStyle(selectedTab == tab ? .primary : .secondary)
+                            .fontWeight(viewModel.selectedTab == tab ? .semibold : .regular)
+                            .foregroundStyle(viewModel.selectedTab == tab ? .primary : .secondary)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                     })
                     .buttonStyle(.plain)
                     .accessibilityLabel("\(tab.rawValue) tab")
-                    .accessibilityValue(selectedTab == tab ? "Selected" : "")
-                    .accessibilityAddTraits(selectedTab == tab ? [.isButton, .isSelected] : .isButton)
+                    .accessibilityValue(viewModel.selectedTab == tab ? "Selected" : "")
+                    .accessibilityAddTraits(viewModel.selectedTab == tab ? [.isButton, .isSelected] : .isButton)
                     .background {
-                        if selectedTab == tab {
+                        if viewModel.selectedTab == tab {
                             Capsule()
                                 .fill(.quaternary)
                         }
@@ -43,38 +50,38 @@ struct AdminView: View {
             }
             .padding()
 
-            if let error = errorMessage {
+            if let error = viewModel.error {
                 Text(error)
                     .foregroundStyle(.red)
                     .font(Typography.meta)
                     .padding(.horizontal)
             }
 
-            switch selectedTab {
+            switch viewModel.selectedTab {
             case .queue: queueView
             case .content: contentView
             case .users: usersView
             case .reports: reportsView
             }
         }
-        .task { await loadQueue() }
+        .task { await viewModel.loadQueue() }
     }
 
     private var queueView: some View {
-        List(pendingWallpapers) { wp in
+        List(viewModel.pendingWallpapers) { wp in
             HStack {
                 VStack(alignment: .leading) {
                     Text(wp.title).fontWeight(.medium)
-                    Text("\(wp.resolution) - \(wp.format)")
+                    Text("\(wp.width)x\(wp.height) - \(wp.durationLabel)")
                         .font(Typography.meta)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Approve") { Task { await approve(wp.id) } }
+                Button("Approve") { Task { await viewModel.approve(id: wp.id) } }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                     .accessibilityLabel("Approve \(wp.title)")
-                Button("Reject") { Task { await reject(wp.id) } }
+                Button("Reject") { Task { await viewModel.reject(id: wp.id) } }
                     .buttonStyle(.bordered)
                     .tint(.red)
                     .controlSize(.small)
@@ -82,7 +89,7 @@ struct AdminView: View {
             }
         }
         .overlay {
-            if pendingWallpapers.isEmpty && !isLoading {
+            if viewModel.pendingWallpapers.isEmpty && !viewModel.isLoading {
                 Text("No pending wallpapers")
                     .foregroundStyle(.secondary)
             }
@@ -96,7 +103,7 @@ struct AdminView: View {
     }
 
     private var usersView: some View {
-        List(users) { user in
+        List(viewModel.users) { user in
             HStack {
                 VStack(alignment: .leading) {
                     Text(user.email)
@@ -105,13 +112,13 @@ struct AdminView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                if user.banned == true {
-                    Button("Unban") { Task { await unban(user.id) } }
+                if user.banned {
+                    Button("Unban") { Task { await viewModel.unban(id: user.id) } }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                         .accessibilityLabel("Unban \(user.email)")
                 } else {
-                    Button("Ban") { Task { await ban(user.id) } }
+                    Button("Ban") { Task { await viewModel.ban(id: user.id) } }
                         .buttonStyle(.bordered)
                         .tint(.red)
                         .controlSize(.small)
@@ -120,11 +127,11 @@ struct AdminView: View {
                 }
             }
         }
-        .task { await loadUsers() }
+        .task { await viewModel.loadUsers() }
     }
 
     private var reportsView: some View {
-        List(reports) { report in
+        List(viewModel.reports) { report in
             HStack {
                 VStack(alignment: .leading) {
                     Text(report.reason)
@@ -133,88 +140,12 @@ struct AdminView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Dismiss") { Task { await dismissReport(report.id) } }
+                Button("Dismiss") { Task { await viewModel.dismissReport(id: report.id) } }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .accessibilityLabel("Dismiss report for wallpaper \(report.wallpaperID)")
             }
         }
-        .task { await loadReports() }
-    }
-
-    // MARK: - API Calls
-
-    private func loadQueue() async {
-        isLoading = true
-        defer { isLoading = false }
-        do {
-            let response = try await appState.api.listQueue()
-            pendingWallpapers = response.wallpapers
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func approve(_ id: String) async {
-        do {
-            try await appState.api.approveWallpaper(id: id)
-            pendingWallpapers.removeAll { $0.id == id }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func reject(_ id: String) async {
-        do {
-            try await appState.api.rejectWallpaper(id: id, reason: "Rejected by admin")
-            pendingWallpapers.removeAll { $0.id == id }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func loadUsers() async {
-        do {
-            let response = try await appState.api.listUsers()
-            users = response.users
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func ban(_ id: String) async {
-        do {
-            try await appState.api.banUser(id: id)
-            await loadUsers()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func unban(_ id: String) async {
-        do {
-            try await appState.api.unbanUser(id: id)
-            await loadUsers()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func loadReports() async {
-        do {
-            let response = try await appState.api.listReports()
-            reports = response.reports
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func dismissReport(_ id: String) async {
-        do {
-            try await appState.api.dismissReport(id: id)
-            reports.removeAll { $0.id == id }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        .task { await viewModel.loadReports() }
     }
 }
