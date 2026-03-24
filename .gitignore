@@ -4,5 +4,11 @@
 !.env.example
 .build/
 .swiftpm/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.xcodebuildmcp/
 server/server
 server/seed
+server/coverage.out
+server/coverage.html
