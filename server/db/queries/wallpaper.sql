@@ -1,6 +1,6 @@
 -- name: CreateWallpaper :one
-INSERT INTO wallpapers (title, uploader_id, storage_key, resolution, width, height, duration, file_size, format, thumbnail_key, preview_key)
-VALUES ($1, $2, $3, '', 0, 0, 0, 0, '', '', '')
+INSERT INTO wallpapers (title, uploader_id, storage_key, category, resolution, width, height, duration, file_size, format, thumbnail_key, preview_key)
+VALUES ($1, $2, $3, $4, '', 0, 0, 0, 0, '', '', '')
 RETURNING id, title, uploader_id, status, COALESCE(category, '') AS category, tags,
           resolution, width, height, duration, file_size, format, download_count,
           storage_key, thumbnail_key, preview_key, rejection_reason, created_at, updated_at;
@@ -72,6 +72,11 @@ WHERE id = $10
 RETURNING id, title, uploader_id, status, COALESCE(category, '') AS category, tags,
           resolution, width, height, duration, file_size, format, download_count,
           storage_key, thumbnail_key, preview_key, rejection_reason, created_at, updated_at;
+
+-- name: UpdateWallpaperStorageKey :exec
+UPDATE wallpapers
+SET storage_key = $1, updated_at = now()
+WHERE id = $2;
 
 -- name: IncrementDownloadCount :exec
 UPDATE wallpapers
