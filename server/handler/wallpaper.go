@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -298,6 +299,8 @@ type wallpaperResponse struct {
 	Format          string   `json:"format"`
 	DownloadCount   int64    `json:"download_count"`
 	DownloadURL     string   `json:"download_url,omitempty"`
+	ThumbnailURL    string   `json:"thumbnail_url,omitempty"`
+	PreviewURL      string   `json:"preview_url,omitempty"`
 	RejectionReason string   `json:"rejection_reason,omitempty"`
 	CreatedAt       string   `json:"created_at"`
 	UpdatedAt       string   `json:"updated_at"`
@@ -326,6 +329,21 @@ func wallpaperToResponse(w *repository.Wallpaper) wallpaperResponse {
 		CreatedAt:       w.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:       w.UpdatedAt.Format(time.RFC3339),
 	}
+}
+
+func wallpaperToResponseWithURLs(ctx context.Context, s storage.Store, w *repository.Wallpaper) wallpaperResponse {
+	resp := wallpaperToResponse(w)
+	if w.ThumbnailKey != "" {
+		if url, err := s.PreSignedURL(ctx, w.ThumbnailKey, 1*time.Hour); err == nil {
+			resp.ThumbnailURL = url
+		}
+	}
+	if w.PreviewKey != "" {
+		if url, err := s.PreSignedURL(ctx, w.PreviewKey, 1*time.Hour); err == nil {
+			resp.PreviewURL = url
+		}
+	}
+	return resp
 }
 
 type listWallpapersResponse struct {
@@ -361,7 +379,7 @@ func (h *WallpaperHandler) List(w http.ResponseWriter, r *http.Request) {
 		Total:      total,
 	}
 	for _, wp := range wallpapers {
-		resp.Wallpapers = append(resp.Wallpapers, wallpaperToResponse(wp))
+		resp.Wallpapers = append(resp.Wallpapers, wallpaperToResponseWithURLs(r.Context(), h.store, wp))
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -381,7 +399,7 @@ func (h *WallpaperHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := wallpaperToResponse(wp)
+	resp := wallpaperToResponseWithURLs(r.Context(), h.store, wp)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
