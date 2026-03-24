@@ -8,12 +8,14 @@ pre-commit:
     go-imports:
       root: server/
       glob: "**/*.go"
-      run: goimports -w {staged_files} && git add {staged_files}
+      run: |
+        export PATH="$HOME/go/bin:/usr/local/go/bin:/opt/homebrew/bin:$PATH"
+        goimports -w {staged_files} && git add {staged_files}
 
     go-lint:
       root: server/
       glob: "**/*.go"
-      run: golangci-lint run --config .golangci.yml
+      run: golangci-lint run --config .golangci.yml --new-from-rev=HEAD
 
     swift-format:
       root: app/

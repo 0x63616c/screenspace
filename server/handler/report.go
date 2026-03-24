@@ -4,17 +4,17 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"time"
 
-	"github.com/0x63616c/screenspace/server/repository"
+	db "github.com/0x63616c/screenspace/server/db/generated"
 )
 
 type ReportHandler struct {
-	reports *repository.ReportRepo
+	q db.Querier
 }
 
-func NewReportHandler(reports *repository.ReportRepo) *ReportHandler {
-	return &ReportHandler{reports: reports}
+// NewReportHandler creates a handler for report operations.
+func NewReportHandler(q db.Querier) *ReportHandler {
+	return &ReportHandler{q: q}
 }
 
 type createReportRequest struct {
@@ -30,14 +30,14 @@ type reportResponse struct {
 	CreatedAt   string `json:"created_at"`
 }
 
-func reportToResponse(r *repository.Report) reportResponse {
+func reportToResponse(r *db.Report) reportResponse {
 	return reportResponse{
-		ID:          r.ID,
-		WallpaperID: r.WallpaperID,
-		ReporterID:  r.ReporterID,
+		ID:          r.ID.String(),
+		WallpaperID: r.WallpaperID.String(),
+		ReporterID:  r.ReporterID.String(),
 		Reason:      r.Reason,
 		Status:      r.Status,
-		CreatedAt:   r.CreatedAt.Format(time.RFC3339),
+		CreatedAt:   timestamptzToString(r.CreatedAt),
 	}
 }
 
@@ -48,9 +48,15 @@ func (h *ReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wallpaperID := r.PathValue("id")
-	if wallpaperID == "" {
+	wallpaperID, err := parseUUID(r.PathValue("id"))
+	if err != nil {
 		http.Error(w, `{"error":"wallpaper id is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	reporterID, err := parseUUID(claims.UserID)
+	if err != nil {
+		http.Error(w, `{"error":"invalid user id"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -70,15 +76,19 @@ func (h *ReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	report, err := h.reports.Create(r.Context(), wallpaperID, claims.UserID, req.Reason)
+	report, err := h.q.CreateReport(r.Context(), db.CreateReportParams{
+		WallpaperID: wallpaperID,
+		ReporterID:  reporterID,
+		Reason:      req.Reason,
+	})
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
 
-	slog.Info("wallpaper reported", "reporter_id", claims.UserID, "wallpaper_id", wallpaperID)
+	slog.Info("wallpaper reported", "reporter_id", claims.UserID, "wallpaper_id", wallpaperID.String()) //nolint:gosec // claims from JWT
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(reportToResponse(report))
+	_ = json.NewEncoder(w).Encode(reportToResponse(&report))
 }

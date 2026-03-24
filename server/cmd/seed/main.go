@@ -2,22 +2,20 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"log"
+	"log/slog"
 	"os"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/0x63616c/screenspace/server/service"
 	"github.com/0x63616c/screenspace/server/storage"
 )
 
 func main() {
-	log.SetFlags(log.Ltime)
-
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		log.Fatal("DATABASE_URL is required")
+		slog.Error("DATABASE_URL is required")
+		os.Exit(1)
 	}
 
 	s3Endpoint := os.Getenv("S3_ENDPOINT")
@@ -26,45 +24,51 @@ func main() {
 	s3SecretKey := os.Getenv("S3_SECRET_KEY")
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		log.Fatal("JWT_SECRET is required")
+		slog.Error("JWT_SECRET is required")
+		os.Exit(1)
 	}
 	adminEmail := envOr("ADMIN_EMAIL", "admin@screenspace.dev")
 
-	// Database
-	db, err := sql.Open("postgres", databaseURL)
-	if err != nil {
-		log.Fatalf("database: %v", err)
-	}
-	defer db.Close()
+	ctx := context.Background()
 
-	if err := db.Ping(); err != nil {
-		log.Fatalf("database ping: %v", err)
+	// Database
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		slog.Error("database", "error", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+
+	if err := pool.Ping(ctx); err != nil {
+		slog.Error("database ping", "error", err)
+		os.Exit(1)
 	}
 
 	// S3 Storage
 	store, err := storage.NewS3Store(s3Endpoint, s3Bucket, s3AccessKey, s3SecretKey)
 	if err != nil {
-		log.Fatalf("storage: %v", err)
+		slog.Error("storage", "error", err)
+		os.Exit(1)
 	}
-	if err := store.EnsureBucket(context.Background()); err != nil {
-		log.Printf("warning: could not ensure bucket: %v", err)
+	if err := store.EnsureBucket(ctx); err != nil {
+		slog.Warn("could not ensure bucket", "error", err)
 	}
 
-	log.Printf("seeding %d wallpapers from Pexels CDN (ffmpeg fallback if download fails)", len(videos))
+	slog.Info("seeding wallpapers from Pexels CDN (ffmpeg fallback if download fails)", "count", len(videos))
 
 	s := &seeder{
-		db:           db,
+		pool:         pool,
 		store:        store,
 		authService:  service.NewAuthService(jwtSecret),
 		videoService: service.NewVideoService(),
 	}
 
-	ctx := context.Background()
 	if err := s.run(ctx, adminEmail); err != nil {
-		log.Fatalf("seed failed: %v", err)
+		slog.Error("seed failed", "error", err)
+		os.Exit(1)
 	}
 
-	log.Println("seed complete")
+	slog.Info("seed complete")
 }
 
 func envOr(key, fallback string) string {

@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -13,14 +13,15 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/0x63616c/screenspace/server/service"
 	"github.com/0x63616c/screenspace/server/storage"
 )
 
 type seeder struct {
-	db           *sql.DB
+	pool         *pgxpool.Pool
 	store        storage.Store
 	authService  *service.AuthService
 	videoService *service.VideoService
@@ -32,25 +33,25 @@ func (s *seeder) run(ctx context.Context, adminEmail string) error {
 	if err != nil {
 		return fmt.Errorf("seed admin user: %w", err)
 	}
-	log.Printf("admin user: %s (%s)", adminEmail, adminID)
+	slog.Info("admin user", "email", adminEmail, "id", adminID)
 
 	userEmail := "user@screenspace.dev"
 	userID, err := s.seedUser(ctx, userEmail, "password", "user")
 	if err != nil {
 		return fmt.Errorf("seed regular user: %w", err)
 	}
-	log.Printf("regular user: %s (%s)", userEmail, userID)
+	slog.Info("regular user", "email", userEmail, "id", userID)
 
 	// Seed wallpapers
 	var wallpaperIDs []string
 	for _, v := range videos {
 		id, err := s.seedWallpaper(ctx, v, adminID)
 		if err != nil {
-			log.Printf("warning: failed to seed %q: %v", v.Title, err)
+			slog.Warn("failed to seed wallpaper", "title", v.Title, "error", err)
 			continue
 		}
 		wallpaperIDs = append(wallpaperIDs, id)
-		log.Printf("seeded wallpaper: %s", v.Title)
+		slog.Info("seeded wallpaper", "title", v.Title)
 	}
 
 	// Add favorites for the regular user (first 3 wallpapers)
@@ -59,23 +60,23 @@ func (s *seeder) run(ctx context.Context, adminEmail string) error {
 			break
 		}
 		if err := s.addFavorite(ctx, userID, wpID); err != nil {
-			log.Printf("warning: failed to add favorite: %v", err)
+			slog.Warn("failed to add favorite", "error", err)
 		}
 	}
-	log.Printf("added %d favorites for %s", min(3, len(wallpaperIDs)), userEmail)
+	slog.Info("added favorites", "count", min(3, len(wallpaperIDs)), "user", userEmail)
 
 	return nil
 }
 
 func (s *seeder) seedUser(ctx context.Context, email, password, role string) (string, error) {
 	var id string
-	err := s.db.QueryRowContext(ctx,
+	err := s.pool.QueryRow(ctx,
 		`SELECT id FROM users WHERE email = $1`, email,
 	).Scan(&id)
 	if err == nil {
 		return id, nil
 	}
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, pgx.ErrNoRows) {
 		return "", fmt.Errorf("check user: %w", err)
 	}
 
@@ -84,7 +85,7 @@ func (s *seeder) seedUser(ctx context.Context, email, password, role string) (st
 		return "", fmt.Errorf("hash password: %w", err)
 	}
 
-	err = s.db.QueryRowContext(ctx,
+	err = s.pool.QueryRow(ctx,
 		`INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id`,
 		email, hash, role,
 	).Scan(&id)
@@ -97,14 +98,14 @@ func (s *seeder) seedUser(ctx context.Context, email, password, role string) (st
 func (s *seeder) seedWallpaper(ctx context.Context, v SeedVideo, uploaderID string) (string, error) {
 	// Idempotency check
 	var existingID string
-	err := s.db.QueryRowContext(ctx,
+	err := s.pool.QueryRow(ctx,
 		`SELECT id FROM wallpapers WHERE title = $1`, v.Title,
 	).Scan(&existingID)
 	if err == nil {
-		log.Printf("  skipping %q (already exists)", v.Title)
+		slog.Info("skipping (already exists)", "title", v.Title)
 		return existingID, nil
 	}
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, pgx.ErrNoRows) {
 		return "", fmt.Errorf("check existing: %w", err)
 	}
 
@@ -112,13 +113,13 @@ func (s *seeder) seedWallpaper(ctx context.Context, v SeedVideo, uploaderID stri
 	if err != nil {
 		return "", fmt.Errorf("create temp dir: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	videoPath := filepath.Join(tmpDir, "video.mp4")
 
 	// Download from Pexels CDN, fall back to generated video
 	if err := downloadFile(ctx, v.URL, videoPath); err != nil {
-		log.Printf("  download failed for %q, generating placeholder: %v", v.Title, err)
+		slog.Warn("download failed, generating placeholder", "title", v.Title, "error", err)
 		if err := generateVideo(ctx, v, videoPath); err != nil {
 			return "", fmt.Errorf("generate video: %w", err)
 		}
@@ -166,11 +167,11 @@ func (s *seeder) seedWallpaper(ctx context.Context, v SeedVideo, uploaderID stri
 	}
 
 	var insertedID string
-	err = s.db.QueryRowContext(ctx,
+	err = s.pool.QueryRow(ctx,
 		`INSERT INTO wallpapers (id, title, uploader_id, status, category, tags, resolution, width, height, duration, file_size, format, download_count, storage_key, thumbnail_key, preview_key)
 		 VALUES ($1, $2, $3, 'approved', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		 RETURNING id`,
-		wpID, v.Title, uploaderID, v.Category, pq.Array(v.Tags),
+		wpID, v.Title, uploaderID, v.Category, v.Tags,
 		resolution, info.Width, info.Height, info.Duration, info.Size, format,
 		v.Downloads, storageKey, thumbKey, previewKey,
 	).Scan(&insertedID)
@@ -186,12 +187,12 @@ func (s *seeder) uploadFile(ctx context.Context, key, filePath, contentType stri
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return s.store.Put(ctx, key, f, contentType)
 }
 
 func (s *seeder) addFavorite(ctx context.Context, userID, wallpaperID string) error {
-	_, err := s.db.ExecContext(ctx,
+	_, err := s.pool.Exec(ctx,
 		`INSERT INTO favorites (user_id, wallpaper_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
 		userID, wallpaperID,
 	)
@@ -199,7 +200,7 @@ func (s *seeder) addFavorite(ctx context.Context, userID, wallpaperID string) er
 }
 
 func downloadFile(ctx context.Context, url, outputPath string) error {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
@@ -207,9 +208,9 @@ func downloadFile(ctx context.Context, url, outputPath string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download returned %d for %s", resp.StatusCode, url)
 	}
 
@@ -217,7 +218,7 @@ func downloadFile(ctx context.Context, url, outputPath string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	_, err = io.Copy(f, resp.Body)
 	return err

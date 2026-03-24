@@ -4,15 +4,19 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/0x63616c/screenspace/server/repository"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	db "github.com/0x63616c/screenspace/server/db/generated"
 )
 
 type FavoriteHandler struct {
-	favorites *repository.FavoriteRepo
+	q    db.Querier
+	pool *pgxpool.Pool
 }
 
-func NewFavoriteHandler(favorites *repository.FavoriteRepo) *FavoriteHandler {
-	return &FavoriteHandler{favorites: favorites}
+// NewFavoriteHandler creates a handler for favorite operations.
+func NewFavoriteHandler(q db.Querier, pool *pgxpool.Pool) *FavoriteHandler {
+	return &FavoriteHandler{q: q, pool: pool}
 }
 
 type toggleFavoriteResponse struct {
@@ -26,14 +30,59 @@ func (h *FavoriteHandler) Toggle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wallpaperID := r.PathValue("id")
-	if wallpaperID == "" {
+	wallpaperID, err := parseUUID(r.PathValue("id"))
+	if err != nil {
 		http.Error(w, `{"error":"wallpaper id is required"}`, http.StatusBadRequest)
 		return
 	}
 
-	favorited, err := h.favorites.Toggle(r.Context(), claims.UserID, wallpaperID)
+	userID, err := parseUUID(claims.UserID)
 	if err != nil {
+		http.Error(w, `{"error":"invalid user id"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Use a transaction for the check+insert/delete toggle
+	tx, err := h.pool.Begin(r.Context())
+	if err != nil {
+		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+	defer func() { _ = tx.Rollback(r.Context()) }()
+
+	txQ := db.New(tx)
+
+	exists, err := txQ.CheckFavorite(r.Context(), db.CheckFavoriteParams{
+		UserID:      userID,
+		WallpaperID: wallpaperID,
+	})
+	if err != nil {
+		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	var favorited bool
+	if exists {
+		if err := txQ.DeleteFavorite(r.Context(), db.DeleteFavoriteParams{
+			UserID:      userID,
+			WallpaperID: wallpaperID,
+		}); err != nil {
+			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+			return
+		}
+		favorited = false
+	} else {
+		if err := txQ.InsertFavorite(r.Context(), db.InsertFavoriteParams{
+			UserID:      userID,
+			WallpaperID: wallpaperID,
+		}); err != nil {
+			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+			return
+		}
+		favorited = true
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
@@ -54,11 +103,26 @@ func (h *FavoriteHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	q := r.URL.Query()
+	userID, err := parseUUID(claims.UserID)
+	if err != nil {
+		http.Error(w, `{"error":"invalid user id"}`, http.StatusBadRequest)
+		return
+	}
 
+	q := r.URL.Query()
 	limit, offset := parseLimitOffset(q)
 
-	wallpapers, total, err := h.favorites.ListByUser(r.Context(), claims.UserID, limit, offset)
+	total, err := h.q.CountFavoritesByUser(r.Context(), userID)
+	if err != nil {
+		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	wallpapers, err := h.q.ListFavoritesByUser(r.Context(), db.ListFavoritesByUserParams{
+		UserID: userID,
+		Lim:    int32(limit),
+		Off:    int32(offset),
+	})
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
@@ -66,10 +130,10 @@ func (h *FavoriteHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	resp := listFavoritesResponse{
 		Wallpapers: make([]wallpaperResponse, 0, len(wallpapers)),
-		Total:      total,
+		Total:      int(total),
 	}
-	for _, wp := range wallpapers {
-		resp.Wallpapers = append(resp.Wallpapers, wallpaperToResponse(wp))
+	for i := range wallpapers {
+		resp.Wallpapers = append(resp.Wallpapers, favoriteRowToResponse(&wallpapers[i]))
 	}
 
 	w.Header().Set("Content-Type", "application/json")

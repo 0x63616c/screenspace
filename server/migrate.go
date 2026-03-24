@@ -1,40 +1,34 @@
 package main
 
 import (
-	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
-	"log"
 
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 //go:embed db/migrations/*.sql
 var migrationsFS embed.FS
 
-func RunMigrations(db *sql.DB) error {
+func RunMigrations(pool *pgxpool.Pool) error {
 	source, err := iofs.New(migrationsFS, "db/migrations")
 	if err != nil {
 		return fmt.Errorf("migration source: %w", err)
 	}
 
-	driver, err := postgres.WithInstance(db, &postgres.Config{})
-	if err != nil {
-		return fmt.Errorf("migration driver: %w", err)
-	}
-
-	m, err := migrate.NewWithInstance("iofs", source, "postgres", driver)
+	connStr := pool.Config().ConnConfig.ConnString()
+	m, err := migrate.NewWithSourceInstance("iofs", source, "pgx5://"+connStr)
 	if err != nil {
 		return fmt.Errorf("migration init: %w", err)
 	}
 
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migration up: %w", err)
 	}
 
-	log.Println("migrations applied successfully")
 	return nil
 }

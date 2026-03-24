@@ -5,27 +5,17 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"time"
 
-	"github.com/0x63616c/screenspace/server/repository"
+	db "github.com/0x63616c/screenspace/server/db/generated"
 )
 
 type AdminHandler struct {
-	wallpapers *repository.WallpaperRepo
-	users      *repository.UserRepo
-	reports    *repository.ReportRepo
+	q db.Querier
 }
 
-func NewAdminHandler(
-	wallpapers *repository.WallpaperRepo,
-	users *repository.UserRepo,
-	reports *repository.ReportRepo,
-) *AdminHandler {
-	return &AdminHandler{
-		wallpapers: wallpapers,
-		users:      users,
-		reports:    reports,
-	}
+// NewAdminHandler creates a handler for admin operations.
+func NewAdminHandler(q db.Querier) *AdminHandler {
+	return &AdminHandler{q: q}
 }
 
 func requireAdmin(r *http.Request) bool {
@@ -42,10 +32,18 @@ func (h *AdminHandler) Queue(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	limit, offset := parseLimitOffset(q)
 
-	wallpapers, total, err := h.wallpapers.List(r.Context(), repository.ListParams{
+	total, err := h.q.CountWallpapers(r.Context(), db.CountWallpapersParams{
 		Status: "pending_review",
-		Limit:  limit,
-		Offset: offset,
+	})
+	if err != nil {
+		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	wallpapers, err := h.q.ListWallpapersRecent(r.Context(), db.ListWallpapersRecentParams{
+		Status: "pending_review",
+		Lim:    int32(limit),
+		Off:    int32(offset),
 	})
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
@@ -54,10 +52,10 @@ func (h *AdminHandler) Queue(w http.ResponseWriter, r *http.Request) {
 
 	resp := listWallpapersResponse{
 		Wallpapers: make([]wallpaperResponse, 0, len(wallpapers)),
-		Total:      total,
+		Total:      int(total),
 	}
-	for _, wp := range wallpapers {
-		resp.Wallpapers = append(resp.Wallpapers, wallpaperToResponse(wp))
+	for i := range wallpapers {
+		resp.Wallpapers = append(resp.Wallpapers, recentRowToResponse(&wallpapers[i]))
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -71,16 +69,24 @@ func (h *AdminHandler) Approve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	claims := claimsFromRequest(r)
-	id := r.PathValue("id")
-	if err := h.wallpapers.UpdateStatus(r.Context(), id, "approved"); err != nil {
+	id, err := parseUUID(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, `{"error":"invalid wallpaper id"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.q.UpdateWallpaperStatus(r.Context(), db.UpdateWallpaperStatusParams{
+		Status: "approved",
+		ID:     id,
+	}); err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
 
-	slog.Info("wallpaper approved", "admin_id", claims.UserID, "wallpaper_id", id, "action", "approve")
+	slog.Info("wallpaper approved", "admin_id", claims.UserID, "wallpaper_id", id.String(), "action", "approve") //nolint:gosec // claims from JWT
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "approved"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "approved"})
 }
 
 type rejectRequest struct {
@@ -93,7 +99,11 @@ func (h *AdminHandler) Reject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := r.PathValue("id")
+	id, err := parseUUID(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, `{"error":"invalid wallpaper id"}`, http.StatusBadRequest)
+		return
+	}
 
 	var req rejectRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -101,16 +111,21 @@ func (h *AdminHandler) Reject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.wallpapers.UpdateStatus(r.Context(), id, "rejected", req.Reason); err != nil {
+	reason := &req.Reason
+	if err := h.q.UpdateWallpaperStatusWithReason(r.Context(), db.UpdateWallpaperStatusWithReasonParams{
+		Status:          "rejected",
+		RejectionReason: reason,
+		ID:              id,
+	}); err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
 
 	claims := claimsFromRequest(r)
-	slog.Info("wallpaper rejected", "admin_id", claims.UserID, "wallpaper_id", id, "action", "reject")
+	slog.Info("wallpaper rejected", "admin_id", claims.UserID, "wallpaper_id", id.String(), "action", "reject") //nolint:gosec // claims from JWT
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "rejected"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "rejected"})
 }
 
 func (h *AdminHandler) ListWallpapers(w http.ResponseWriter, r *http.Request) {
@@ -127,10 +142,18 @@ func (h *AdminHandler) ListWallpapers(w http.ResponseWriter, r *http.Request) {
 		status = "approved"
 	}
 
-	wallpapers, total, err := h.wallpapers.List(r.Context(), repository.ListParams{
+	total, err := h.q.CountWallpapers(r.Context(), db.CountWallpapersParams{
 		Status: status,
-		Limit:  limit,
-		Offset: offset,
+	})
+	if err != nil {
+		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	wallpapers, err := h.q.ListWallpapersRecent(r.Context(), db.ListWallpapersRecentParams{
+		Status: status,
+		Lim:    int32(limit),
+		Off:    int32(offset),
 	})
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
@@ -139,10 +162,10 @@ func (h *AdminHandler) ListWallpapers(w http.ResponseWriter, r *http.Request) {
 
 	resp := listWallpapersResponse{
 		Wallpapers: make([]wallpaperResponse, 0, len(wallpapers)),
-		Total:      total,
+		Total:      int(total),
 	}
-	for _, wp := range wallpapers {
-		resp.Wallpapers = append(resp.Wallpapers, wallpaperToResponse(wp))
+	for i := range wallpapers {
+		resp.Wallpapers = append(resp.Wallpapers, recentRowToResponse(&wallpapers[i]))
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -161,7 +184,11 @@ func (h *AdminHandler) EditWallpaper(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := r.PathValue("id")
+	id, err := parseUUID(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, `{"error":"invalid wallpaper id"}`, http.StatusBadRequest)
+		return
+	}
 
 	var req editWallpaperRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -174,7 +201,17 @@ func (h *AdminHandler) EditWallpaper(w http.ResponseWriter, r *http.Request) {
 		tags = []string{}
 	}
 
-	if err := h.wallpapers.UpdateMetadata(r.Context(), id, req.Title, req.Category, tags); err != nil {
+	var catPtr *string
+	if req.Category != "" {
+		catPtr = &req.Category
+	}
+
+	if err := h.q.UpdateWallpaperMetadata(r.Context(), db.UpdateWallpaperMetadataParams{
+		Title:    req.Title,
+		Category: catPtr,
+		Tags:     tags,
+		ID:       id,
+	}); err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
@@ -206,23 +243,54 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	limit, offset := parseLimitOffset(q)
 	search := q.Get("q")
 
-	users, total, err := h.users.ListWithSearch(r.Context(), search, limit, offset)
-	if err != nil {
-		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
-		return
+	var users []db.User
+	var total int64
+
+	if search != "" {
+		searchPattern := "%" + search + "%"
+		var err error
+		total, err = h.q.CountUsersWithSearch(r.Context(), searchPattern)
+		if err != nil {
+			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+			return
+		}
+		users, err = h.q.ListUsersWithSearch(r.Context(), db.ListUsersWithSearchParams{
+			Query: searchPattern,
+			Lim:   int32(limit),
+			Off:   int32(offset),
+		})
+		if err != nil {
+			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+			return
+		}
+	} else {
+		var err error
+		total, err = h.q.CountUsers(r.Context())
+		if err != nil {
+			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+			return
+		}
+		users, err = h.q.ListUsers(r.Context(), db.ListUsersParams{
+			Lim: int32(limit),
+			Off: int32(offset),
+		})
+		if err != nil {
+			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+			return
+		}
 	}
 
 	resp := listUsersResponse{
 		Users: make([]userResponse, 0, len(users)),
-		Total: total,
+		Total: int(total),
 	}
 	for _, u := range users {
 		resp.Users = append(resp.Users, userResponse{
-			ID:        u.ID,
+			ID:        u.ID.String(),
 			Email:     u.Email,
 			Role:      u.Role,
 			Banned:    u.Banned,
-			CreatedAt: u.CreatedAt.Format(time.RFC3339),
+			CreatedAt: timestamptzToString(u.CreatedAt),
 		})
 	}
 
@@ -236,21 +304,26 @@ func (h *AdminHandler) BanUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := r.PathValue("id")
-	if _, err := h.users.GetByID(r.Context(), id); err != nil {
+	id, err := parseUUID(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, `{"error":"invalid user id"}`, http.StatusBadRequest)
+		return
+	}
+
+	if _, err := h.q.GetUserByID(r.Context(), id); err != nil {
 		http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
 		return
 	}
-	if err := h.users.SetBanned(r.Context(), id, true); err != nil {
+	if err := h.q.SetBanned(r.Context(), db.SetBannedParams{Banned: true, ID: id}); err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
 
 	claims := claimsFromRequest(r)
-	slog.Info("user banned", "admin_id", claims.UserID, "target_user_id", id, "action", "ban")
+	slog.Info("user banned", "admin_id", claims.UserID, "target_user_id", id.String(), "action", "ban") //nolint:gosec // claims from JWT
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "banned"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "banned"})
 }
 
 func (h *AdminHandler) UnbanUser(w http.ResponseWriter, r *http.Request) {
@@ -259,18 +332,23 @@ func (h *AdminHandler) UnbanUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := r.PathValue("id")
-	if _, err := h.users.GetByID(r.Context(), id); err != nil {
+	id, err := parseUUID(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, `{"error":"invalid user id"}`, http.StatusBadRequest)
+		return
+	}
+
+	if _, err := h.q.GetUserByID(r.Context(), id); err != nil {
 		http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
 		return
 	}
-	if err := h.users.SetBanned(r.Context(), id, false); err != nil {
+	if err := h.q.SetBanned(r.Context(), db.SetBannedParams{Banned: false, ID: id}); err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
 
 	claims := claimsFromRequest(r)
-	slog.Info("user unbanned", "admin_id", claims.UserID, "target_user_id", id, "action", "unban")
+	slog.Info("user unbanned", "admin_id", claims.UserID, "target_user_id", id.String(), "action", "unban") //nolint:gosec // claims from JWT
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "unbanned"})
@@ -282,18 +360,23 @@ func (h *AdminHandler) PromoteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := r.PathValue("id")
-	if _, err := h.users.GetByID(r.Context(), id); err != nil {
+	id, err := parseUUID(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, `{"error":"invalid user id"}`, http.StatusBadRequest)
+		return
+	}
+
+	if _, err := h.q.GetUserByID(r.Context(), id); err != nil {
 		http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
 		return
 	}
-	if err := h.users.SetRole(r.Context(), id, "admin"); err != nil {
+	if err := h.q.SetRole(r.Context(), db.SetRoleParams{Role: "admin", ID: id}); err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
 
 	claims := claimsFromRequest(r)
-	slog.Info("user promoted", "admin_id", claims.UserID, "target_user_id", id)
+	slog.Info("user promoted", "admin_id", claims.UserID, "target_user_id", id.String()) //nolint:gosec // claims from JWT
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "promoted"})
@@ -313,7 +396,16 @@ func (h *AdminHandler) ListReports(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	limit, offset := parseLimitOffset(q)
 
-	reports, total, err := h.reports.ListPending(r.Context(), limit, offset)
+	total, err := h.q.CountPendingReports(r.Context())
+	if err != nil {
+		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	reports, err := h.q.ListPendingReports(r.Context(), db.ListPendingReportsParams{
+		Lim: int32(limit),
+		Off: int32(offset),
+	})
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
@@ -321,10 +413,10 @@ func (h *AdminHandler) ListReports(w http.ResponseWriter, r *http.Request) {
 
 	resp := listReportsResponse{
 		Reports: make([]reportResponse, 0, len(reports)),
-		Total:   total,
+		Total:   int(total),
 	}
-	for _, rpt := range reports {
-		resp.Reports = append(resp.Reports, reportToResponse(rpt))
+	for i := range reports {
+		resp.Reports = append(resp.Reports, reportToResponse(&reports[i]))
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -338,13 +430,18 @@ func (h *AdminHandler) DismissReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	claims := claimsFromRequest(r)
-	id := r.PathValue("id")
-	if err := h.reports.Dismiss(r.Context(), id); err != nil {
+	id, err := parseUUID(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, `{"error":"invalid report id"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.q.DismissReport(r.Context(), id); err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
 
-	slog.Info("report dismissed", "admin_id", claims.UserID, "report_id", id)
+	slog.Info("report dismissed", "admin_id", claims.UserID, "report_id", id.String()) //nolint:gosec // claims from JWT
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "dismissed"})

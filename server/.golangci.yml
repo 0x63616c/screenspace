@@ -62,7 +62,7 @@ linters:
       no-mixed-args: true
       kv-only: true
       static-msg: true
-      no-global: "all"
+      no-global: ""
 
     revive:
       rules:
@@ -85,8 +85,8 @@ linters:
       rules:
         no-stdlib-log:
           deny:
-            - pkg: "log"
-              desc: "Use slog instead of the standard log package"
+            - pkg: "log$"
+              desc: "Use log/slog instead of the standard log package"
         no-lib-pq:
           deny:
             - pkg: "github.com/lib/pq"

@@ -2,15 +2,18 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 
+	db "github.com/0x63616c/screenspace/server/db/generated"
 	"github.com/0x63616c/screenspace/server/handler"
 	"github.com/0x63616c/screenspace/server/middleware"
-	"github.com/0x63616c/screenspace/server/repository"
 	"github.com/0x63616c/screenspace/server/service"
 	"github.com/0x63616c/screenspace/server/storage"
 )
@@ -18,55 +21,74 @@ import (
 func main() {
 	cfg, err := LoadConfig()
 	if err != nil {
-		log.Fatalf("config: %v", err)
+		slog.Error("config", "error", err)
+		os.Exit(1)
 	}
 
-	// Database
-	db, err := sql.Open("postgres", cfg.DatabaseURL)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// Database pool
+	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("database: %v", err)
+		slog.Error("database config", "error", err)
+		os.Exit(1)
 	}
-	defer db.Close()
+	poolCfg.MaxConns = int32(cfg.DBMaxConns)
+	poolCfg.MinConns = int32(cfg.DBMinConns)
+	poolCfg.MaxConnLifetime = cfg.DBMaxConnLifetime
+	poolCfg.HealthCheckPeriod = cfg.DBHealthCheckPeriod
 
-	if err := RunMigrations(db); err != nil {
-		log.Fatalf("migrations: %v", err)
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
+	if err != nil {
+		slog.Error("database pool", "error", err)
+		os.Exit(1)
 	}
+	defer pool.Close()
+
+	if err := pool.Ping(ctx); err != nil {
+		slog.Error("database ping", "error", err)
+		os.Exit(1)
+	}
+
+	if err := RunMigrations(pool); err != nil {
+		slog.Error("migrations", "error", err)
+		os.Exit(1)
+	}
+
+	// Querier
+	q := db.New(pool)
 
 	// S3 Storage
 	store, err := storage.NewS3Store(cfg.S3Endpoint, cfg.S3Bucket, cfg.S3AccessKey, cfg.S3SecretKey)
 	if err != nil {
-		log.Fatalf("storage: %v", err)
+		slog.Error("storage", "error", err)
+		os.Exit(1)
 	}
-	if err := store.EnsureBucket(context.Background()); err != nil {
-		log.Printf("warning: could not ensure bucket: %v", err)
+	if err := store.EnsureBucket(ctx); err != nil {
+		slog.Warn("could not ensure bucket", "error", err)
 	}
-
-	// Repositories
-	userRepo := repository.NewUserRepo(db)
-	wallpaperRepo := repository.NewWallpaperRepo(db)
-	favoriteRepo := repository.NewFavoriteRepo(db)
-	reportRepo := repository.NewReportRepo(db)
 
 	// Services
 	authService := service.NewAuthService(cfg.JWTSecret)
 	videoService := service.NewVideoService()
 
 	// Handlers
-	authHandler := handler.NewAuthHandler(userRepo, authService, cfg.AdminEmail)
-	wallpaperHandler := handler.NewWallpaperHandler(wallpaperRepo, store, videoService, authService)
-	favoriteHandler := handler.NewFavoriteHandler(favoriteRepo)
-	reportHandler := handler.NewReportHandler(reportRepo)
-	adminHandler := handler.NewAdminHandler(wallpaperRepo, userRepo, reportRepo)
+	authHandler := handler.NewAuthHandler(q, authService, cfg.AdminEmail)
+	wallpaperHandler := handler.NewWallpaperHandler(q, store, videoService, authService)
+	favoriteHandler := handler.NewFavoriteHandler(q, pool)
+	reportHandler := handler.NewReportHandler(q)
+	adminHandler := handler.NewAdminHandler(q)
 
 	// Middleware
 	authMw := middleware.Auth(authService)
-	uploadLimiter := middleware.NewRateLimiter(5) // 5 uploads per day
+	uploadLimiter := middleware.NewRateLimiter(cfg.UploadRateLimit)
 
-	// Router
+	// Router (still net/http.ServeMux - chi migration is a later plan)
 	mux := http.NewServeMux()
 
-	// Public routes
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
@@ -78,7 +100,6 @@ func main() {
 	mux.HandleFunc("GET /api/v1/wallpapers/recent", wallpaperHandler.Recent)
 	mux.HandleFunc("GET /api/v1/wallpapers/{id}", wallpaperHandler.Get)
 
-	// Authenticated routes
 	mux.Handle("GET /api/v1/auth/me", authMw(http.HandlerFunc(authHandler.Me)))
 	mux.Handle("POST /api/v1/wallpapers", authMw(uploadLimiter.Middleware(http.HandlerFunc(wallpaperHandler.Create))))
 	mux.Handle("POST /api/v1/wallpapers/{id}/download", authMw(http.HandlerFunc(wallpaperHandler.Download)))
@@ -88,7 +109,6 @@ func main() {
 	mux.Handle("GET /api/v1/me/favorites", authMw(http.HandlerFunc(favoriteHandler.List)))
 	mux.Handle("POST /api/v1/wallpapers/{id}/report", authMw(http.HandlerFunc(reportHandler.Create)))
 
-	// Admin routes (auth + admin middleware)
 	mux.Handle("GET /api/v1/admin/queue", authMw(middleware.Admin(http.HandlerFunc(adminHandler.Queue))))
 	mux.Handle("POST /api/v1/admin/queue/{id}/approve", authMw(middleware.Admin(http.HandlerFunc(adminHandler.Approve))))
 	mux.Handle("POST /api/v1/admin/queue/{id}/reject", authMw(middleware.Admin(http.HandlerFunc(adminHandler.Reject))))
@@ -101,6 +121,27 @@ func main() {
 	mux.Handle("GET /api/v1/admin/reports", authMw(middleware.Admin(http.HandlerFunc(adminHandler.ListReports))))
 	mux.Handle("POST /api/v1/admin/reports/{id}/dismiss", authMw(middleware.Admin(http.HandlerFunc(adminHandler.DismissReport))))
 
-	log.Printf("listening on :%s", cfg.Port)
-	log.Fatal(http.ListenAndServe(":"+cfg.Port, mux))
+	srv := &http.Server{
+		Addr:         ":" + cfg.Port,
+		Handler:      mux,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	go func() {
+		slog.Info("listening", "port", cfg.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	<-ctx.Done()
+	slog.Info("shutting down", "signal", ctx.Err())
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		slog.Error("shutdown", "error", err)
+	}
 }

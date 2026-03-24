@@ -15,4 +15,5 @@ sql:
           - db_type: "uuid"
             go_type: "github.com/google/uuid.UUID"
           - db_type: "pg_catalog.text[]"
-            go_type: "[]string"
+            go_type:
+              type: "[]string"
