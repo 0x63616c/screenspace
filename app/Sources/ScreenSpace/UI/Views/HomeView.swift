@@ -34,30 +34,37 @@ struct HomeView: View {
             } else {
                 VStack(alignment: .leading, spacing: Spacing.xxl) {
                     if let error = loadError {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, Spacing.xl)
+                        VStack(spacing: Spacing.md) {
+                            Text(error)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, Spacing.xl)
+                        .padding(.top, Spacing.xxl)
                     }
 
-                    HeroSection(
-                        wallpaper: featured,
-                        onViewWallpaper: {
-                            if let f = featured { fetchAndShow(id: f.id) }
-                        },
-                        onFavorite: {
-                            guard let f = featured, appState.isLoggedIn else { return }
-                            Task { _ = try? await appState.api.toggleFavorite(id: f.id) }
-                        }
-                    )
-                        .padding(.horizontal, Spacing.xl)
+                    if !popular.isEmpty || !recent.isEmpty {
+                        HeroSection(
+                            wallpaper: featured,
+                            onViewWallpaper: {
+                                if let f = featured { fetchAndShow(id: f.id) }
+                            },
+                            onFavorite: {
+                                guard let f = featured, appState.isLoggedIn else { return }
+                                Task { _ = try? await appState.api.toggleFavorite(id: f.id) }
+                            }
+                        )
+                            .padding(.horizontal, Spacing.xl)
 
-                    ShelfRow(title: "Popular", wallpapers: popular, onSelectWallpaper: { data in
-                        fetchAndShow(id: data.id)
-                    })
-                    ShelfRow(title: "Recently Added", wallpapers: recent, onSelectWallpaper: { data in
-                        fetchAndShow(id: data.id)
-                    })
+                        ShelfRow(title: "Popular", wallpapers: popular, onSelectWallpaper: { data in
+                            fetchAndShow(id: data.id)
+                        })
+                        ShelfRow(title: "Recently Added", wallpapers: recent, onSelectWallpaper: { data in
+                            fetchAndShow(id: data.id)
+                        })
+                    }
                 }
                 .padding(.vertical, Spacing.xl)
             }
@@ -71,10 +78,7 @@ struct HomeView: View {
                 recent = rec.wallpapers.map { $0.toCardData() }
                 featured = popular.first
             } catch {
-                loadError = "Connect to a server in Settings to browse community wallpapers."
-                popular = Self.placeholderData
-                recent = Self.placeholderData
-                featured = Self.placeholderData.first
+                loadError = "Community gallery unavailable. Connect to a server in Settings."
             }
             isLoading = false
         }
@@ -89,14 +93,4 @@ struct HomeView: View {
         }
     }
 
-    private static let placeholderData: [WallpaperCardData] = (0..<8).map { i in
-        WallpaperCardData(
-            id: "\(i)",
-            title: ["Sea Cliffs", "Mountain Dawn", "City Lights", "Northern Lights", "Ocean Waves", "Forest Rain", "Desert Storm", "Sunset Beach"][i],
-            thumbnailURL: nil,
-            width: [1920, 2560, 3840, 3840, 2560, 1920, 3840, 2560][i],
-            height: [1080, 1440, 2160, 2160, 1440, 1080, 2160, 1440][i],
-            duration: Double(20 + i * 5)
-        )
-    }
 }
