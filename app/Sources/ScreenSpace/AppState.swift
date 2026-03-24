@@ -8,7 +8,7 @@ final class AppState {
     let fileSystem: FileSystemProviding
     let keychain: KeychainProviding
     let configStore: ConfigStoring
-    let playlistManager: PlaylistManager
+    let playlistManager: any PlaylistManaging
     let eventLog: EventLogging
     let cache: CacheProviding
 
@@ -37,7 +37,7 @@ final class AppState {
         fileSystem: FileSystemProviding? = nil,
         keychain: KeychainProviding? = nil,
         configStore: ConfigStoring? = nil,
-        playlistManager: PlaylistManager? = nil,
+        playlistManager: (any PlaylistManaging)? = nil,
         eventLog: EventLogging? = nil,
         cache: CacheProviding? = nil,
         engine: WallpaperEngine? = nil,
@@ -125,7 +125,7 @@ final class AppState {
     }
 
     func skipToNext() async {
-        let allPlaylists = await playlistManager.playlists
+        let allPlaylists = playlistManager.playlists
         guard let playlist = allPlaylists.first, !playlist.items.isEmpty else { return }
         if let firstItem = playlist.items.first,
            let path = firstItem.path,
