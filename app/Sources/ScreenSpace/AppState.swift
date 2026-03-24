@@ -3,36 +3,68 @@ import SwiftUI
 @Observable
 @MainActor
 final class AppState {
-    let engine: WallpaperEngine
-    let api: APIClient
-    let configManager: ConfigManager
+    let apiService: APIProviding
+    let wallpaperProvider: WallpaperProviding
+    let fileSystem: FileSystemProviding
+    let keychain: KeychainProviding
+    let configStore: ConfigStoring
     let playlistManager: PlaylistManager
-    let lockScreen: LockScreenManager
-    let pauseController: PauseController
+    let eventLog: EventLogging
+    let cache: CacheProviding
 
-    var currentUser: UserResponse?
-    var isLoggedIn: Bool { currentUser != nil }
-    var isAdmin: Bool { currentUser?.role == .admin }
+    let engine: WallpaperEngine
+    let pauseController: PauseController
+    let lockScreen: LockScreenManager
+    let configManager: ConfigManager
+
+    /// Keep APIClient for backward compat during migration
+    let api: APIClient
+
+    var currentUser: UserInfo?
+    var isLoggedIn: Bool {
+        currentUser != nil
+    }
+
+    var isAdmin: Bool {
+        currentUser?.role == .admin
+    }
+
     var currentWallpaperURL: URL?
     var currentWallpaperTitle: String?
 
-    /// Called when the now-playing title changes so the menu bar can update.
     var onNowPlayingChanged: ((String?) -> Void)?
 
     init(
-        engine: WallpaperEngine? = nil,
-        api: APIClient? = nil,
-        configManager: ConfigManager? = nil,
+        api: APIProviding? = nil,
+        wallpaperProvider: WallpaperProviding? = nil,
+        fileSystem: FileSystemProviding? = nil,
+        keychain: KeychainProviding? = nil,
+        configStore: ConfigStoring? = nil,
         playlistManager: PlaylistManager? = nil,
-        initialConfig: AppConfig = .default
+        eventLog: EventLogging? = nil,
+        cache: CacheProviding? = nil,
+        engine: WallpaperEngine? = nil,
+        configManager: ConfigManager? = nil
     ) {
+        let kc = keychain ?? LiveKeychain()
+        let cs = configStore ?? LiveConfigStore()
         let cm = configManager ?? .shared
+        let apiClient = APIClient(network: LiveNetwork(), keychain: kc)
+
+        self.keychain = kc
+        self.configStore = cs
+        self.fileSystem = fileSystem ?? LiveFileSystem()
+        self.playlistManager = playlistManager ?? PlaylistManager.shared
+        self.eventLog = eventLog ?? EventLog.shared
+        self.cache = cache ?? LiveCache()
+        self.wallpaperProvider = wallpaperProvider ?? LiveWallpaperProvider()
+        apiService = api ?? APIService(client: apiClient)
+        self.api = apiClient
         self.configManager = cm
-        self.playlistManager = playlistManager ?? .shared
-        self.api = api ?? APIClient()
-        self.lockScreen = LockScreenManager()
+        lockScreen = LockScreenManager()
         self.engine = engine ?? WallpaperEngine(configManager: cm)
-        self.pauseController = PauseController(config: initialConfig)
+        let config = cs.load()
+        pauseController = PauseController(config: config)
 
         // Wire PauseController to Engine via @Observable observation
         Task { @MainActor [weak self] in
@@ -69,27 +101,27 @@ final class AppState {
     }
 
     func login(email: String, password: String) async throws {
-        _ = try await api.login(email: email, password: password)
-        currentUser = try await api.me()
+        _ = try await apiService.login(email: email, password: password)
+        currentUser = try await apiService.me()
     }
 
     func register(email: String, password: String) async throws {
-        _ = try await api.register(email: email, password: password)
-        currentUser = try await api.me()
+        _ = try await apiService.register(email: email, password: password)
+        currentUser = try await apiService.me()
     }
 
     func logout() {
-        api.logout()
+        apiService.logout()
         currentUser = nil
     }
 
     func restoreSession() async {
-        guard LiveKeychain().load(key: "auth_token") != nil else { return }
-        currentUser = try? await api.me()
+        guard keychain.load(key: "auth_token") != nil else { return }
+        currentUser = try? await apiService.me()
     }
 
     func restoreLastWallpaper() async {
-        let config = await configManager.config
+        let config = configStore.load()
         guard let urlString = config.lastPlayedURL,
               let url = URL(string: urlString),
               FileManager.default.fileExists(atPath: url.path) else { return }
@@ -97,11 +129,12 @@ final class AppState {
     }
 
     func skipToNext() async {
-        let playlists = await playlistManager.playlists
-        guard let playlist = playlists.first, !playlist.items.isEmpty else { return }
+        let allPlaylists = await playlistManager.playlists
+        guard let playlist = allPlaylists.first, !playlist.items.isEmpty else { return }
         if let firstItem = playlist.items.first,
            let path = firstItem.path,
-           firstItem.source == .local {
+           firstItem.source == .local
+        {
             let url = URL(fileURLWithPath: path)
             if FileManager.default.fileExists(atPath: url.path) {
                 await setWallpaper(url: url, title: url.lastPathComponent)

@@ -3,8 +3,13 @@ import Foundation
 struct LiveConfigStore: ConfigStoring {
     private let configURL: URL
 
-    init(configURL: URL) {
-        self.configURL = configURL
+    init(configURL: URL? = nil) {
+        self.configURL = configURL ?? {
+            let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+                .appendingPathComponent("ScreenSpace")
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            return dir.appendingPathComponent("config.json")
+        }()
     }
 
     func load() -> AppConfig {

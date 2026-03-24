@@ -3,59 +3,65 @@ import Testing
 
 @MainActor
 struct SettingsViewModelTests {
-    private func makeVM() -> (SettingsViewModel, MockConfigStore, MockCache) {
+    struct TestHarness {
+        let vm: SettingsViewModel
+        let store: MockConfigStore
+        let cache: MockCache
+    }
+
+    private func makeVM() -> TestHarness {
         let store = MockConfigStore()
         let cache = MockCache()
         let vm = SettingsViewModel(configStore: store, cache: cache, eventLog: MockEventLog())
-        return (vm, store, cache)
+        return TestHarness(vm: vm, store: store, cache: cache)
     }
 
     @Test("initializes from config store")
     func initializesFromStore() {
-        let (vm, store, _) = makeVM()
-        #expect(vm.config == store.storedConfig)
-        #expect(vm.serverURL == store.storedConfig.serverURL)
+        let h = makeVM()
+        #expect(h.vm.config == h.store.storedConfig)
+        #expect(h.vm.serverURL == h.store.storedConfig.serverURL)
     }
 
     @Test("updateConfig persists changes")
     func updateConfigPersists() {
-        let (vm, store, _) = makeVM()
+        let h = makeVM()
 
-        vm.updateConfig { $0.pauseOnBattery = false }
+        h.vm.updateConfig { $0.pauseOnBattery = false }
 
-        #expect(store.storedConfig.pauseOnBattery == false)
+        #expect(h.store.storedConfig.pauseOnBattery == false)
     }
 
     @Test("commitServerURL saves to config")
     func commitServerURLSaves() {
-        let (vm, store, _) = makeVM()
-        vm.serverURL = "http://localhost:9090"
+        let h = makeVM()
+        h.vm.serverURL = "http://localhost:9090"
 
-        vm.commitServerURL()
+        h.vm.commitServerURL()
 
-        #expect(store.storedConfig.serverURL == "http://localhost:9090")
+        #expect(h.store.storedConfig.serverURL == "http://localhost:9090")
     }
 
     @Test("clearCache resets cacheSize to zero")
     func clearCacheResetsSizeToZero() {
-        let (vm, _, cache) = makeVM()
-        cache.currentSize = 500
+        let h = makeVM()
+        h.cache.currentSize = 500
 
-        vm.clearCache()
+        h.vm.clearCache()
 
-        #expect(vm.cacheSize == 0)
-        #expect(cache.clearCacheCalled == true)
+        #expect(h.vm.cacheSize == 0)
+        #expect(h.cache.clearCacheCalled == true)
     }
 
     @Test("formatSize formats megabytes correctly")
     func formatSizeMB() {
-        let (vm, _, _) = makeVM()
-        #expect(vm.formatSize(512) == "512 MB")
+        let h = makeVM()
+        #expect(h.vm.formatSize(512) == "512 MB")
     }
 
     @Test("formatSize converts to GB for large values")
     func formatSizeGB() {
-        let (vm, _, _) = makeVM()
-        #expect(vm.formatSize(2048) == "2.0 GB")
+        let h = makeVM()
+        #expect(h.vm.formatSize(2048) == "2.0 GB")
     }
 }

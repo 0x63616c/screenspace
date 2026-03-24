@@ -8,6 +8,14 @@ actor EventLog: EventLogging {
     private let sessionID: String
     private let appVersion: String
 
+    static let shared: EventLog = {
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("ScreenSpace")
+            .appendingPathComponent("logs")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return EventLog(logsDirectory: dir)
+    }()
+
     private static let logFileName = "events.jsonl"
     private static let defaultMaxFileSizeBytes: Int64 = 5 * 1024 * 1024
     private static let defaultMaxFileCount = 3
@@ -49,7 +57,7 @@ actor EventLog: EventLogging {
             "sid": sessionID,
             "v": appVersion,
             "event": event,
-            "data": data,
+            "data": data
         ]
     }
 
