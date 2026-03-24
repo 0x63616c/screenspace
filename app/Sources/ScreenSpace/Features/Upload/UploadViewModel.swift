@@ -28,14 +28,19 @@ final class UploadViewModel {
         selectedFileURL != nil && !title.trimmingCharacters(in: .whitespaces).isEmpty && acceptedPolicy && !isUploading
     }
 
-    var selectedFileSizeMB: Double? {
-        guard let url = selectedFileURL,
-              let size = try? fileSystem.fileSize(at: url) else { return nil }
-        return Double(size) / 1_000_000
+    var selectedFileSizeBytes: Int64? {
+        guard let url = selectedFileURL else { return nil }
+        return try? fileSystem.fileSize(at: url)
+    }
+
+    var formattedFileSize: String? {
+        guard let bytes = selectedFileSizeBytes else { return nil }
+        return formatFileSize(bytes)
     }
 
     var fileTooLarge: Bool {
-        (selectedFileSizeMB ?? 0) > 200
+        guard let bytes = selectedFileSizeBytes else { return false }
+        return Double(bytes) / 1_000_000 > 200
     }
 
     var parsedTags: [String] {

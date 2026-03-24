@@ -17,7 +17,13 @@ final class DetailViewModel {
     var reportReason = ""
     var error: String?
 
-    init(wallpaper: WallpaperDetail, api: APIProviding, wallpaperProvider: WallpaperProviding, cache: CacheProviding, eventLog: EventLogging) {
+    init(
+        wallpaper: WallpaperDetail,
+        api: APIProviding,
+        wallpaperProvider: WallpaperProviding,
+        cache: CacheProviding,
+        eventLog: EventLogging
+    ) {
         self.wallpaper = wallpaper
         self.api = api
         self.wallpaperProvider = wallpaperProvider
@@ -77,8 +83,7 @@ final class DetailViewModel {
     }
 
     var formattedSize: String {
-        let mb = Double(wallpaper.fileSize) / 1_000_000
-        return String(format: "%.0fMB", mb)
+        formatFileSize(wallpaper.fileSize)
     }
 
     var formattedDuration: String {

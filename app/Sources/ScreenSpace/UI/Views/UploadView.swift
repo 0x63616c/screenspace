@@ -5,16 +5,31 @@ import UniformTypeIdentifiers
 struct UploadView: View {
     @Environment(AppState.self) var appState
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedFileURL: URL?
-    @State private var title = ""
-    @State private var category = ""
-    @State private var tagsText = ""
-    @State private var acceptedPolicy = false
-    @State private var isUploading = false
-    @State private var uploadProgress: Double = 0
-    @State private var errorMessage: String?
-    @State private var uploadComplete = false
-    @State private var categories: [String] = []
+    @State private var viewModel: UploadViewModel?
+
+    var body: some View {
+        Group {
+            if let viewModel {
+                UploadContentView(viewModel: viewModel, dismiss: dismiss)
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            if viewModel == nil {
+                viewModel = UploadViewModel(
+                    api: appState.apiService,
+                    fileSystem: appState.fileSystem,
+                    eventLog: appState.eventLog
+                )
+            }
+        }
+    }
+}
+
+private struct UploadContentView: View {
+    @Bindable var viewModel: UploadViewModel
+    let dismiss: DismissAction
 
     var body: some View {
         VStack(spacing: Spacing.lg) {
@@ -23,27 +38,22 @@ struct UploadView: View {
 
             // File picker
             GroupBox {
-                if let url = selectedFileURL {
+                if let url = viewModel.selectedFileURL {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Image(systemName: "film")
                             Text(url.lastPathComponent)
                             Spacer()
-                            if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-                               let size = attrs[.size] as? Int
-                            {
-                                let mb = Double(size) / 1_000_000
-                                Text(String(format: "%.1f MB", mb))
+                            if let size = viewModel.formattedFileSize {
+                                Text(size)
                                     .font(Typography.meta)
-                                    .foregroundStyle(mb > 200 ? .red : .secondary)
+                                    .foregroundStyle(viewModel.fileTooLarge ? .red : .secondary)
                             }
                             Button("Change") { pickFile() }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
                         }
-                        if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-                           let size = attrs[.size] as? Int, Double(size) / 1_000_000 > 200
-                        {
+                        if viewModel.fileTooLarge {
                             Text("File exceeds 200 MB limit")
                                 .font(Typography.meta).foregroundStyle(.red)
                         }
@@ -57,21 +67,21 @@ struct UploadView: View {
             }
 
             // Metadata
-            TextField("Title", text: $title)
+            TextField("Title", text: $viewModel.title)
                 .textFieldStyle(.roundedBorder)
 
-            Picker("Category", selection: $category) {
-                Text("Select category").tag("")
-                ForEach(categories, id: \.self) { cat in
-                    Text(cat.capitalized).tag(cat)
+            Picker("Category", selection: $viewModel.category) {
+                Text("Select category").tag(nil as Category?)
+                ForEach(viewModel.categories, id: \.self) { cat in
+                    Text(cat.rawValue.capitalized).tag(cat as Category?)
                 }
             }
 
-            TextField("Tags (comma separated)", text: $tagsText)
+            TextField("Tags (comma separated)", text: $viewModel.tagsText)
                 .textFieldStyle(.roundedBorder)
 
             // Content policy
-            Toggle(isOn: $acceptedPolicy) {
+            Toggle(isOn: $viewModel.acceptedPolicy) {
                 HStack(spacing: 4) {
                     Text("I confirm this content complies with the")
                     Text("content policy")
@@ -89,22 +99,22 @@ struct UploadView: View {
                 .font(Typography.meta)
             }
             .accessibilityLabel("Content policy agreement")
-            .accessibilityValue(acceptedPolicy ? "Agreed" : "Not agreed")
+            .accessibilityValue(viewModel.acceptedPolicy ? "Agreed" : "Not agreed")
 
-            if let error = errorMessage {
+            if let error = viewModel.errorMessage {
                 Text(error)
                     .foregroundStyle(.red)
                     .font(Typography.meta)
             }
 
-            if isUploading {
-                ProgressView(value: uploadProgress)
+            if viewModel.isUploading {
+                ProgressView(value: viewModel.uploadProgress)
                 Text("Uploading...")
                     .font(Typography.meta)
                     .foregroundStyle(.secondary)
             }
 
-            if uploadComplete {
+            if viewModel.uploadComplete {
                 Label("Upload complete! Pending review.", systemImage: "checkmark.circle")
                     .foregroundStyle(.green)
             }
@@ -114,27 +124,17 @@ struct UploadView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
 
-                Button("Upload") { Task { await upload() } }
+                Button("Upload") { Task { await viewModel.upload() } }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.regular)
-                    .disabled(!canUpload)
+                    .disabled(!viewModel.canUpload)
                     .accessibilityLabel("Upload wallpaper")
                     .accessibilityHint("Submits your wallpaper for review")
             }
         }
         .padding()
         .frame(width: 400)
-        .task {
-            do {
-                categories = try await appState.api.listCategories()
-            } catch {
-                categories = CategoriesResponse.fallback
-            }
-        }
-    }
-
-    private var canUpload: Bool {
-        selectedFileURL != nil && !title.isEmpty && acceptedPolicy && !isUploading
+        .task { await viewModel.loadCategories() }
     }
 
     private func pickFile() {
@@ -142,54 +142,7 @@ struct UploadView: View {
         panel.allowedContentTypes = [.mpeg4Movie, .quickTimeMovie]
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK {
-            selectedFileURL = panel.url
+            viewModel.selectedFileURL = panel.url
         }
-    }
-
-    private func upload() async {
-        guard let fileURL = selectedFileURL else { return }
-        isUploading = true
-        errorMessage = nil
-
-        let tags = tagsText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-
-        do {
-            // Step 1: Initiate upload
-            uploadProgress = 0.1
-            let initResponse = try await appState.api.initiateUpload(
-                title: title,
-                category: category.isEmpty ? nil : Category(rawValue: category),
-                tags: tags
-            )
-
-            // Step 2: Upload file to pre-signed URL
-            uploadProgress = 0.3
-            guard let uploadURL = URL(string: initResponse.uploadURL) else {
-                errorMessage = "Invalid upload URL from server"
-                isUploading = false
-                return
-            }
-            var uploadRequest = URLRequest(url: uploadURL)
-            uploadRequest.httpMethod = "PUT"
-            uploadRequest.setValue("video/mp4", forHTTPHeaderField: "Content-Type")
-            let fileData = try Data(contentsOf: fileURL)
-            let (_, response) = try await URLSession.shared.upload(for: uploadRequest, from: fileData)
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200 ..< 300).contains(httpResponse.statusCode)
-            else {
-                throw APIError.httpError(status: 0, message: "Upload to storage failed")
-            }
-
-            // Step 3: Finalize
-            uploadProgress = 0.8
-            try await appState.api.finalizeUpload(id: initResponse.id)
-
-            uploadProgress = 1.0
-            uploadComplete = true
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-
-        isUploading = false
     }
 }
