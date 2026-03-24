@@ -47,7 +47,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	if err := RunMigrations(pool); err != nil {
+	if err := RunMigrations(cfg.DatabaseURL); err != nil {
 		slog.Error("migrations", "error", err)
 		os.Exit(1)
 	}
