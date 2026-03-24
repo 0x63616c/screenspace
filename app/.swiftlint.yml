@@ -1,0 +1,43 @@
+included:
+  - Sources
+  - Tests
+
+excluded:
+  - Sources/ScreenSpace/generated
+
+opt_in_rules:
+  - empty_count
+  - closure_spacing
+  - first_where
+  - overridden_super_call
+  - fatal_error_message
+  - redundant_nil_coalescing
+
+disabled_rules:
+  - trailing_comma
+  - opening_brace
+  - identifier_name
+  - line_length
+
+custom_rules:
+  no_force_unwrap:
+    name: "Force Unwrap"
+    regex: "(?<![\"\\s])!(?=[.\\[\\(]|\\s*=)"
+    message: "Avoid force unwrapping. Use guard let or if let."
+    severity: warning
+
+line_length:
+  warning: 120
+  error: 160
+
+function_body_length:
+  warning: 60
+  error: 100
+
+type_body_length:
+  warning: 300
+  error: 500
+
+file_length:
+  warning: 400
+  error: 600
