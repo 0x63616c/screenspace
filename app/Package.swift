@@ -37,7 +37,7 @@ let package = Package(
         ),
         .testTarget(
             name: "ScreenSpaceTests",
-            dependencies: ["ScreenSpace"],
+            dependencies: ["ScreenSpace", "ScreenSpaceAPI"],
             path: "Tests/ScreenSpaceTests"
         )
     ]
