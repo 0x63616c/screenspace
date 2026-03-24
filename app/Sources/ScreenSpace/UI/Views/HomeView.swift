@@ -1,30 +1,32 @@
 import SwiftUI
 
-extension WallpaperResponse {
-    func toCardData() -> WallpaperCardData {
-        WallpaperCardData(
-            id: id,
-            title: title,
-            thumbnailURL: thumbnailURL.flatMap { URL(string: $0) },
-            width: width,
-            height: height,
-            duration: duration
-        )
+struct HomeView: View {
+    @Environment(AppState.self) var appState
+    @State private var viewModel: HomeViewModel?
+
+    var body: some View {
+        Group {
+            if let viewModel {
+                HomeContentView(viewModel: viewModel, appState: appState)
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            if viewModel == nil {
+                viewModel = HomeViewModel(api: appState.apiService, eventLog: appState.eventLog)
+            }
+        }
     }
 }
 
-struct HomeView: View {
-    @Environment(AppState.self) var appState
-    @State private var popular: [WallpaperCardData] = []
-    @State private var recent: [WallpaperCardData] = []
-    @State private var featured: WallpaperCardData?
-    @State private var isLoading = true
-    @State private var loadError: String?
-    @State private var selectedWallpaper: WallpaperResponse?
+private struct HomeContentView: View {
+    @Bindable var viewModel: HomeViewModel
+    let appState: AppState
 
     var body: some View {
         ScrollView {
-            if isLoading {
+            if viewModel.isLoading {
                 VStack {
                     Spacer(minLength: 100)
                     ProgressView("Loading wallpapers...")
@@ -33,7 +35,7 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity)
             } else {
                 VStack(alignment: .leading, spacing: Spacing.xxl) {
-                    if let error = loadError {
+                    if let error = viewModel.error {
                         VStack(spacing: Spacing.md) {
                             Text(error)
                                 .font(Typography.meta)
@@ -45,24 +47,27 @@ struct HomeView: View {
                         .padding(.top, Spacing.xxl)
                     }
 
-                    if !popular.isEmpty || !recent.isEmpty {
+                    if !viewModel.popular.isEmpty || !viewModel.recent.isEmpty {
                         HeroSection(
-                            wallpaper: featured,
+                            wallpaper: viewModel.featured,
                             onViewWallpaper: {
-                                if let f = featured { fetchAndShow(id: f.id) }
+                                if let f = viewModel.featured {
+                                    Task { await viewModel.fetchDetail(id: f.id) }
+                                }
                             },
                             onFavorite: {
-                                guard let f = featured, appState.isLoggedIn else { return }
-                                Task { _ = try? await appState.api.toggleFavorite(id: f.id) }
+                                if let f = viewModel.featured {
+                                    Task { await viewModel.toggleFavorite(id: f.id, isLoggedIn: appState.isLoggedIn) }
+                                }
                             }
                         )
                         .padding(.horizontal, Spacing.xl)
 
-                        ShelfRow(title: "Popular", wallpapers: popular, onSelectWallpaper: { data in
-                            fetchAndShow(id: data.id)
+                        ShelfRow(title: "Popular", wallpapers: viewModel.popular, onSelectWallpaper: { data in
+                            Task { await viewModel.fetchDetail(id: data.id) }
                         })
-                        ShelfRow(title: "Recently Added", wallpapers: recent, onSelectWallpaper: { data in
-                            fetchAndShow(id: data.id)
+                        ShelfRow(title: "Recently Added", wallpapers: viewModel.recent, onSelectWallpaper: { data in
+                            Task { await viewModel.fetchDetail(id: data.id) }
                         })
                     }
                 }
@@ -70,26 +75,9 @@ struct HomeView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .task {
-            do {
-                let pop = try await appState.api.popularWallpapers(limit: 10)
-                let rec = try await appState.api.recentWallpapers(limit: 10)
-                popular = pop.wallpapers.map { $0.toCardData() }
-                recent = rec.wallpapers.map { $0.toCardData() }
-                featured = popular.first
-            } catch {
-                loadError = "Community gallery unavailable. Connect to a server in Settings."
-            }
-            isLoading = false
-        }
-        .sheet(item: $selectedWallpaper) { wp in
-            DetailView(wallpaper: wp)
-        }
-    }
-
-    private func fetchAndShow(id: String) {
-        Task {
-            selectedWallpaper = try? await appState.api.getWallpaper(id: id)
+        .task { await viewModel.load() }
+        .sheet(item: $viewModel.selectedDetail) { detail in
+            DetailView(wallpaper: detail)
         }
     }
 }
