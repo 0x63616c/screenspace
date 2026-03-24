@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	db "github.com/0x63616c/screenspace/server/db/generated"
-	"github.com/0x63616c/screenspace/server/internal/handler"
+	"github.com/0x63616c/screenspace/server/internal/apperr"
 )
 
 // FavoriteService handles toggling and listing favorites.
@@ -27,7 +27,7 @@ func (s *FavoriteService) Toggle(ctx context.Context, userID, wallpaperID uuid.U
 		WallpaperID: wallpaperID,
 	})
 	if err != nil {
-		return false, handler.Internal(fmt.Errorf("check favorite: %w", err))
+		return false, apperr.Internal(fmt.Errorf("check favorite: %w", err))
 	}
 
 	if exists {
@@ -35,7 +35,7 @@ func (s *FavoriteService) Toggle(ctx context.Context, userID, wallpaperID uuid.U
 			UserID:      userID,
 			WallpaperID: wallpaperID,
 		}); err != nil {
-			return false, handler.Internal(fmt.Errorf("delete favorite: %w", err))
+			return false, apperr.Internal(fmt.Errorf("delete favorite: %w", err))
 		}
 		return false, nil
 	}
@@ -44,7 +44,7 @@ func (s *FavoriteService) Toggle(ctx context.Context, userID, wallpaperID uuid.U
 		UserID:      userID,
 		WallpaperID: wallpaperID,
 	}); err != nil {
-		return false, handler.Internal(fmt.Errorf("insert favorite: %w", err))
+		return false, apperr.Internal(fmt.Errorf("insert favorite: %w", err))
 	}
 	return true, nil
 }

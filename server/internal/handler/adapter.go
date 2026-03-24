@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/0x63616c/screenspace/server/internal/apperr"
 	"github.com/0x63616c/screenspace/server/internal/respond"
 )
 
@@ -22,7 +23,7 @@ func Wrap(h HandlerFunc) http.HandlerFunc {
 }
 
 func handleError(w http.ResponseWriter, r *http.Request, err error) {
-	if appErr, ok := errors.AsType[*AppError](err); ok {
+	if appErr, ok := errors.AsType[*apperr.Error](err); ok {
 		if appErr.Status >= 500 {
 			slog.Error("request error",
 				"method", r.Method,
@@ -37,13 +38,13 @@ func handleError(w http.ResponseWriter, r *http.Request, err error) {
 
 	// Sentinel error mapping for errors returned directly from services.
 	switch {
-	case errors.Is(err, ErrNotFound):
+	case errors.Is(err, apperr.ErrNotFound):
 		respond.Error(w, http.StatusNotFound, "not_found", "not found")
-	case errors.Is(err, ErrForbidden):
+	case errors.Is(err, apperr.ErrForbidden):
 		respond.Error(w, http.StatusForbidden, "forbidden", "forbidden")
-	case errors.Is(err, ErrConflict):
+	case errors.Is(err, apperr.ErrConflict):
 		respond.Error(w, http.StatusConflict, "conflict", "conflict")
-	case errors.Is(err, ErrBadRequest):
+	case errors.Is(err, apperr.ErrBadRequest):
 		respond.Error(w, http.StatusBadRequest, "bad_request", "bad request")
 	default:
 		slog.Error("unhandled request error",

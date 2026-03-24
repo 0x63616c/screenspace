@@ -8,7 +8,7 @@ import (
 
 	db "github.com/0x63616c/screenspace/server/db/generated"
 	"github.com/0x63616c/screenspace/server/internal/config"
-	"github.com/0x63616c/screenspace/server/internal/handler"
+	"github.com/0x63616c/screenspace/server/internal/apperr"
 )
 
 // ReportService handles report creation and admin dismissal.
@@ -24,10 +24,10 @@ func NewReportService(q db.Querier, cfg *config.Config) *ReportService {
 // Create validates and persists a new report.
 func (s *ReportService) Create(ctx context.Context, wallpaperID, reporterID uuid.UUID, reason string) (*db.Report, error) {
 	if reason == "" {
-		return nil, handler.BadRequest("reason is required")
+		return nil, apperr.BadRequest("reason is required")
 	}
 	if len(reason) > s.cfg.MaxReportLength {
-		return nil, handler.BadRequest(fmt.Sprintf("reason must be %d characters or fewer", s.cfg.MaxReportLength))
+		return nil, apperr.BadRequest(fmt.Sprintf("reason must be %d characters or fewer", s.cfg.MaxReportLength))
 	}
 
 	report, err := s.db.CreateReport(ctx, db.CreateReportParams{
@@ -36,7 +36,7 @@ func (s *ReportService) Create(ctx context.Context, wallpaperID, reporterID uuid
 		Reason:      reason,
 	})
 	if err != nil {
-		return nil, handler.Internal(fmt.Errorf("create report: %w", err))
+		return nil, apperr.Internal(fmt.Errorf("create report: %w", err))
 	}
 	return &report, nil
 }
@@ -44,7 +44,7 @@ func (s *ReportService) Create(ctx context.Context, wallpaperID, reporterID uuid
 // Dismiss marks a report as dismissed.
 func (s *ReportService) Dismiss(ctx context.Context, reportID uuid.UUID) error {
 	if err := s.db.DismissReport(ctx, reportID); err != nil {
-		return handler.Internal(fmt.Errorf("dismiss report: %w", err))
+		return apperr.Internal(fmt.Errorf("dismiss report: %w", err))
 	}
 	return nil
 }
