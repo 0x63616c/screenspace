@@ -1,19 +1,5 @@
 import SwiftUI
 
-struct WallpaperCardData: Identifiable {
-    let id: String
-    let title: String
-    let thumbnailURL: URL?
-    let width: Int
-    let height: Int
-    let duration: Double
-
-    var durationLabel: String {
-        let seconds = Int(duration)
-        return "\(seconds)s"
-    }
-}
-
 struct WallpaperCard: View {
     let data: WallpaperCardData
     var onTap: (() -> Void)? = nil

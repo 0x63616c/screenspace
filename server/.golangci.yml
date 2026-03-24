@@ -1,0 +1,109 @@
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    # Defaults (re-enabled explicitly)
+    - errcheck
+    - govet
+    - staticcheck    # includes gosimple (merged in golangci-lint v2)
+    - unused
+    - ineffassign
+
+    # Error handling
+    - errorlint       # enforce errors.Is/errors.As (NOT wrapcheck: conflicts with handler adapter pattern)
+
+    # Security
+    - gosec
+
+    # Performance
+    - bodyclose
+    - perfsprint
+
+    # Style
+    - revive
+    - misspell
+    - unconvert
+    - nakedret
+
+    # Complexity
+    - cyclop
+    - gocyclo
+
+    # Modern Go
+    - modernize
+    - sloglint
+
+    # Completeness
+    - exhaustive
+    - noctx
+
+    # Import control
+    - depguard
+
+  settings:
+    cyclop:
+      max-complexity: 15
+
+    gocyclo:
+      min-complexity: 15
+
+    nakedret:
+      max-func-lines: 5
+
+    exhaustive:
+      default-signifies-exhaustive: false
+
+    sloglint:
+      no-mixed-args: true
+      kv-only: true
+      static-msg: true
+      no-global: ""
+
+    revive:
+      rules:
+        - name: exported
+        - name: var-naming
+        - name: error-return
+        - name: error-naming
+        - name: if-return
+        - name: increment-decrement
+        - name: range
+        - name: time-naming
+        - name: unexported-return
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: empty-block
+
+    depguard:
+      rules:
+        no-stdlib-log:
+          deny:
+            - pkg: "log$"
+              desc: "Use log/slog instead of the standard log package"
+        no-lib-pq:
+          deny:
+            - pkg: "github.com/lib/pq"
+              desc: "Use pgx/v5 instead of lib/pq"
+        no-database-sql:
+          deny:
+            - pkg: "database/sql"
+              desc: "Use pgx/v5 directly instead of database/sql"
+
+    gosec:
+      excludes:
+        - G115  # integer overflow conversion: too noisy for HTTP status codes
+
+  exclusions:
+    rules:
+      # Test files: relax some rules
+      - path: "_test\\.go"
+        linters:
+          - gosec
+          - errcheck

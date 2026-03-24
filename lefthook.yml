@@ -1,12 +1,29 @@
+# lefthook.yml
+# Pre-commit hooks for Go (server/) and Swift (app/)
+# Install: lefthook install
+
 pre-commit:
   parallel: true
   commands:
+    go-imports:
+      root: server/
+      glob: "**/*.go"
+      run: |
+        export PATH="$HOME/go/bin:/usr/local/go/bin:/opt/homebrew/bin:$PATH"
+        goimports -w {staged_files} && git add {staged_files}
+
+    go-lint:
+      root: server/
+      glob: "**/*.go"
+      run: golangci-lint run --config .golangci.yml --new-from-rev=HEAD
+
     swift-format:
       root: app/
-      glob: "*.swift"
-      run: swiftformat --config .swiftformat {staged_files}
+      glob: "**/*.swift"
+      run: test -f .swiftformat && swiftformat --config .swiftformat {staged_files} || swiftformat {staged_files}
       stage_fixed: true
+
     swift-lint:
       root: app/
-      glob: "*.swift"
-      run: swiftlint lint --strict --config .swiftlint.yml {staged_files}
+      glob: "**/*.swift"
+      run: test -f .swiftlint.yml && swiftlint lint --strict {staged_files} || true

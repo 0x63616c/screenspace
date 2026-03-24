@@ -5,23 +5,30 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
+
+	db "github.com/0x63616c/screenspace/server/db/generated"
 	"github.com/0x63616c/screenspace/server/middleware"
-	"github.com/0x63616c/screenspace/server/repository"
 	"github.com/0x63616c/screenspace/server/service"
 )
 
 type AuthHandler struct {
-	users *repository.UserRepo
+	q     db.Querier
 	auth  *service.AuthService
 	admin string
 }
 
-func NewAuthHandler(users *repository.UserRepo, auth *service.AuthService, adminEmail string) *AuthHandler {
-	return &AuthHandler{users: users, auth: auth, admin: adminEmail}
+// NewAuthHandler creates a handler for authentication operations.
+func NewAuthHandler(q db.Querier, auth *service.AuthService, adminEmail string) *AuthHandler {
+	return &AuthHandler{q: q, auth: auth, admin: adminEmail}
 }
 
 func claimsFromRequest(r *http.Request) *service.TokenClaims {
 	return middleware.ClaimsFromContext(r.Context())
+}
+
+func parseUUID(s string) (uuid.UUID, error) {
+	return uuid.Parse(s)
 }
 
 type authRequest struct {
@@ -63,7 +70,11 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		role = "admin"
 	}
 
-	user, err := h.users.Create(r.Context(), req.Email, hash, role)
+	user, err := h.q.CreateUser(r.Context(), db.CreateUserParams{
+		Email:        req.Email,
+		PasswordHash: hash,
+		Role:         role,
+	})
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique") {
 			http.Error(w, `{"error":"email already exists"}`, http.StatusConflict)
@@ -73,7 +84,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.auth.GenerateToken(user.ID, user.Role)
+	token, err := h.auth.GenerateToken(user.ID.String(), user.Role)
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
@@ -96,7 +107,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.users.GetByEmail(r.Context(), req.Email)
+	user, err := h.q.GetUserByEmail(r.Context(), req.Email)
 	if err != nil {
 		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
 		return
@@ -112,7 +123,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.auth.GenerateToken(user.ID, user.Role)
+	token, err := h.auth.GenerateToken(user.ID.String(), user.Role)
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
@@ -129,12 +140,18 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.users.GetByID(r.Context(), claims.UserID)
+	uid, err := parseUUID(claims.UserID)
+	if err != nil {
+		http.Error(w, `{"error":"invalid user id"}`, http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.q.GetUserByID(r.Context(), uid)
 	if err != nil {
 		http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(meResponse{ID: user.ID, Email: user.Email, Role: user.Role})
+	_ = json.NewEncoder(w).Encode(meResponse{ID: user.ID.String(), Email: user.Email, Role: user.Role})
 }
