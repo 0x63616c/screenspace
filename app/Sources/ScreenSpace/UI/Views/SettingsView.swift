@@ -12,7 +12,7 @@ private extension View {
 struct SettingsView: View {
     @Environment(AppState.self) var appState
     @State private var config: AppConfig = .default
-    @State private var cacheSize = CacheManager.shared.currentCacheSizeMB()
+    @State private var cacheSize = 0
     @State private var serverURL: String = AppConfig.defaultServerURL
     @State private var showLogin = false
     @State private var settingsError: String?
@@ -33,6 +33,7 @@ struct SettingsView: View {
             config = await appState.configManager.config
             serverURL = config.serverURL
             playlists = await appState.playlistManager.playlists
+            cacheSize = appState.cache.currentSizeMB()
         }
     }
 
@@ -114,7 +115,7 @@ struct SettingsView: View {
             ), in: 1024 ... 20480, step: 1024)
 
             Button("Clear Cache") {
-                try? CacheManager.shared.clearCache()
+                appState.cache.clearCache()
                 cacheSize = 0
             }
             .accessibilityLabel("Clear cache")
