@@ -20,6 +20,7 @@ struct DetailView: View {
                     api: appState.apiService,
                     wallpaperProvider: appState.wallpaperProvider,
                     cache: appState.cache,
+                    lockScreen: appState.lockScreen,
                     eventLog: appState.eventLog
                 )
             }
@@ -92,7 +93,7 @@ private struct DetailContentView: View {
                             .accessibilityLabel("Set \(viewModel.wallpaper.title) as wallpaper")
                             .accessibilityHint("Downloads and plays this wallpaper on your desktop")
 
-                            Button(action: setAsLockScreen) {
+                            Button(action: { Task { await viewModel.setAsLockScreen() } }) {
                                 Label("Lock Screen", systemImage: "lock.rectangle")
                             }
                             .buttonStyle(.bordered)
@@ -160,19 +161,5 @@ private struct DetailContentView: View {
             get: { viewModel.error },
             set: { viewModel.error = $0 }
         ))
-    }
-
-    private func setAsLockScreen() {
-        Task {
-            guard let cached = appState.cache.cachedURL(for: viewModel.wallpaper.id) else {
-                viewModel.error = "Download the wallpaper first before setting it as lock screen."
-                return
-            }
-            do {
-                try await appState.lockScreen.setLockScreen(from: cached)
-            } catch {
-                viewModel.error = "Failed to set lock screen: \(error.localizedDescription)"
-            }
-        }
     }
 }

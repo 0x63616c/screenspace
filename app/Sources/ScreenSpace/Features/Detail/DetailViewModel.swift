@@ -6,6 +6,7 @@ final class DetailViewModel {
     private let api: APIProviding
     private let wallpaperProvider: WallpaperProviding
     private let cache: CacheProviding
+    private let lockScreen: LockScreenManager
     private let eventLog: EventLogging
 
     let wallpaper: WallpaperDetail
@@ -22,12 +23,14 @@ final class DetailViewModel {
         api: APIProviding,
         wallpaperProvider: WallpaperProviding,
         cache: CacheProviding,
+        lockScreen: LockScreenManager,
         eventLog: EventLogging
     ) {
         self.wallpaper = wallpaper
         self.api = api
         self.wallpaperProvider = wallpaperProvider
         self.cache = cache
+        self.lockScreen = lockScreen
         self.eventLog = eventLog
     }
 
@@ -79,6 +82,19 @@ final class DetailViewModel {
             eventLog.log("reported", data: ["id": wallpaper.id])
         } catch {
             self.error = "Failed to submit report."
+        }
+    }
+
+    func setAsLockScreen() async {
+        guard let cached = cache.cachedURL(for: wallpaper.id) else {
+            error = "Download the wallpaper first before setting it as lock screen."
+            return
+        }
+        do {
+            try await lockScreen.setLockScreen(from: cached)
+            eventLog.log("lock_screen_set", data: ["id": wallpaper.id])
+        } catch {
+            self.error = "Failed to set lock screen: \(error.localizedDescription)"
         }
     }
 

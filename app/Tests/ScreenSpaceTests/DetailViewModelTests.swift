@@ -14,6 +14,7 @@ struct DetailViewModelTests {
             api: api ?? MockAPI(),
             wallpaperProvider: provider ?? MockWallpaperProvider(),
             cache: cache ?? MockCache(),
+            lockScreen: LockScreenManager(),
             eventLog: MockEventLog()
         )
     }
