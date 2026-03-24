@@ -30,7 +30,7 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(wallpaper.title, "Ocean")
         XCTAssertEqual(wallpaper.width, 3840)
         XCTAssertEqual(wallpaper.fileSize, 85000000)
-        XCTAssertEqual(wallpaper.category, "nature")
+        XCTAssertEqual(wallpaper.category, .nature)
     }
 
     func testDecodeAuthResponse() throws {
@@ -40,6 +40,6 @@ final class APIClientTests: XCTestCase {
 
         let auth = try JSONDecoder().decode(AuthResponse.self, from: json)
         XCTAssertEqual(auth.token, "jwt-token-here")
-        XCTAssertEqual(auth.role, "admin")
+        XCTAssertEqual(auth.role, .admin)
     }
 }

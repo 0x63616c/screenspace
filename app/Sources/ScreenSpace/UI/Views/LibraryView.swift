@@ -97,12 +97,13 @@ struct LibraryView: View {
                 guard VideoImporter.isValidVideo(url: url) else { return }
                 do {
                     let imported = try VideoImporter.importVideo(from: url, to: VideoImporter.libraryDirectory())
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         localVideos.append(imported)
                     }
                 } catch {
-                    DispatchQueue.main.async {
-                        importError = "Failed to import \(url.lastPathComponent): \(error.localizedDescription)"
+                    let message = "Failed to import \(url.lastPathComponent): \(error.localizedDescription)"
+                    Task { @MainActor in
+                        importError = message
                     }
                 }
             }

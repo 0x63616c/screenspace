@@ -84,7 +84,7 @@ final class AppState {
     }
 
     func restoreSession() async {
-        guard KeychainHelper.loadToken() != nil else { return }
+        guard LiveKeychain().load(key: "auth_token") != nil else { return }
         currentUser = try? await api.me()
     }
 

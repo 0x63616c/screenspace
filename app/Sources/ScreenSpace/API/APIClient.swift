@@ -1,26 +1,32 @@
 import Foundation
 
-final class APIClient: @unchecked Sendable {
+final class APIClient: Sendable {
     let baseURL: String
-    private let session: URLSession
+    private let network: NetworkProviding
+    private let keychain: KeychainProviding
 
-    init(baseURL: String? = nil) {
+    init(
+        baseURL: String? = nil,
+        network: NetworkProviding = LiveNetwork(),
+        keychain: KeychainProviding = LiveKeychain()
+    ) {
         self.baseURL = baseURL ?? AppConfig.defaultServerURL
-        self.session = URLSession.shared
+        self.network = network
+        self.keychain = keychain
     }
 
     // MARK: - Auth
     func register(email: String, password: String) async throws -> AuthResponse {
         let body = AuthRequest(email: email, password: password)
         let response: AuthResponse = try await post(path: "/api/v1/auth/register", body: body)
-        try KeychainHelper.saveToken(response.token)
+        try keychain.save(key: "auth_token", data: Data(response.token.utf8))
         return response
     }
 
     func login(email: String, password: String) async throws -> AuthResponse {
         let body = AuthRequest(email: email, password: password)
         let response: AuthResponse = try await post(path: "/api/v1/auth/login", body: body)
-        try KeychainHelper.saveToken(response.token)
+        try keychain.save(key: "auth_token", data: Data(response.token.utf8))
         return response
     }
 
@@ -29,7 +35,7 @@ final class APIClient: @unchecked Sendable {
     }
 
     func logout() {
-        KeychainHelper.deleteToken()
+        keychain.delete(key: "auth_token")
     }
 
     // MARK: - Wallpapers
@@ -154,7 +160,7 @@ final class APIClient: @unchecked Sendable {
         guard let url = buildURL(path: path, query: query) else { throw APIError.invalidURL }
         var request = URLRequest(url: url)
         if authenticated { addAuth(&request) }
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await network.data(for: request)
         try checkResponse(response, data: data)
         return try JSONDecoder().decode(T.self, from: data)
     }
@@ -166,7 +172,7 @@ final class APIClient: @unchecked Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let body { request.httpBody = try JSONEncoder().encode(body) }
         if authenticated { addAuth(&request) }
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await network.data(for: request)
         try checkResponse(response, data: data)
         return try JSONDecoder().decode(T.self, from: data)
     }
@@ -178,7 +184,7 @@ final class APIClient: @unchecked Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = body
         if authenticated { addAuth(&request) }
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await network.data(for: request)
         try checkResponse(response, data: data)
         return try JSONDecoder().decode(T.self, from: data)
     }
@@ -190,13 +196,14 @@ final class APIClient: @unchecked Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = body
         if authenticated { addAuth(&request) }
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await network.data(for: request)
         try checkResponse(response, data: data)
         return try JSONDecoder().decode(T.self, from: data)
     }
 
     private func addAuth(_ request: inout URLRequest) {
-        if let token = KeychainHelper.loadToken() {
+        if let tokenData = keychain.load(key: "auth_token"),
+           let token = String(data: tokenData, encoding: .utf8) {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
     }
